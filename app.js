@@ -79,7 +79,78 @@
     const scroll = $('#chat-scroll');
     scroll.scrollTop = scroll.scrollHeight;
   }
-  async function sendMessage(text,fromVoice){const messages=storage.read('messages');messages.push({role:'user',text,at:Date.now()});storage.write('messages',messages.slice(-100));renderChat();const box=$('#messages');const status=document.createElement('div');status.className='message system';status.textContent=API_ENDPOINT?'Думаю…':'Backend LUMI ещё не настроен. Сообщение сохранено на этом устройстве.';box.append(status);if(!API_ENDPOINT){if(fromVoice)speak(status.textContent);return;}$('#chat-input').disabled=true;$('.send').disabled=true;try{const response=await fetch(API_ENDPOINT.replace(/\/$/,'')+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:tg?.initData||'',messages:storage.read('messages').filter(m=>m.role==='user'||m.role==='assistant').slice(-16).map(m=>({role:m.role,text:m.text}))})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Не удалось получить ответ');const answer={role:'assistant',text:data.reply,at:Date.now()};const current=storage.read('messages');current.push(answer);storage.write('messages',current.slice(-100));status.remove();const row=document.createElement('div');row.className='message system';row.textContent=answer.text;box.append(row);$('#chat-scroll').scrollTop = $('#chat-scroll').scrollHeight;if(fromVoice)speak(answer.text);voiceStatus.textContent='Ответ LUMI готов.';}catch(error){status.textContent=error.message||'Не удалось связаться с LUMI. Попробуй ещё раз.';if(fromVoice)speak(status.textContent);}finally{$('#chat-input').disabled=false;$('.send').disabled=false;}}
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function revealReply(row, reply) {
+    const scroll = $('#chat-scroll');
+    const letters = Array.from(reply);
+    const duration = Math.min(4800, letters.length * 22);
+    const start = performance.now();
+    const text = document.createTextNode('');
+    row.replaceChildren(text);
+    row.setAttribute('aria-busy', 'true');
+    let shown = 0;
+    function frame(now) {
+      if (!row.isConnected) return;
+      const follow = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 48;
+      const immediate = reducedMotion.matches || document.hidden || current !== 'chat';
+      const count = immediate || !duration ? letters.length :
+        Math.min(letters.length, 1 + Math.floor(letters.length * (now - start) / duration));
+      if (count > shown) text.appendData(letters.slice(shown, count).join(''));
+      shown = count;
+      if (follow) scroll.scrollTop = scroll.scrollHeight;
+      if (shown < letters.length) requestAnimationFrame(frame);
+      else row.removeAttribute('aria-busy');
+    }
+    frame(start);
+  }
+
+  async function sendMessage(text, fromVoice) {
+    const messages = storage.read('messages');
+    messages.push({role: 'user', text, at: Date.now()});
+    storage.write('messages', messages.slice(-100));
+    renderChat();
+    const box = $('#messages');
+    box.lastElementChild?.classList.add('new-turn');
+    const row = document.createElement('div');
+    row.className = 'message system new-turn';
+    box.append(row);
+    if (!API_ENDPOINT) {
+      row.textContent = 'Сервер LUMI ещё не настроен. Сообщение сохранено на этом устройстве.';
+      if (fromVoice) speak(row.textContent);
+      return;
+    }
+    row.innerHTML = 'Думаю<span class="waiting-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>';
+    const scroll = $('#chat-scroll');
+    scroll.scrollTop = scroll.scrollHeight;
+    input.disabled = true;
+    $('.send').disabled = true;
+    try {
+      const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-16);
+      const response = await fetch(API_ENDPOINT.replace(/\/$/, '') + '/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({initData: tg?.initData || '', messages: history.map(({role, text}) => ({role, text}))})
+      });
+      const data = await response.json();
+      if (!response.ok || typeof data.reply !== 'string' || !data.reply.trim()) {
+        throw new Error(data.error || 'Не удалось получить ответ');
+      }
+      const historyNow = storage.read('messages');
+      if (!row.isConnected && !historyNow.some(m => m.at === messages.at(-1).at)) return;
+      historyNow.push({role: 'assistant', text: data.reply, at: Date.now()});
+      storage.write('messages', historyNow.slice(-100));
+      if (row.isConnected) revealReply(row, data.reply);
+      else renderChat();
+      if (fromVoice) speak(data.reply);
+      voiceStatus.textContent = 'Ответ LUMI готов.';
+    } catch (error) {
+      row.textContent = error.message || 'Не удалось связаться с LUMI. Попробуй ещё раз.';
+      if (fromVoice && row.isConnected) speak(row.textContent);
+    } finally {
+      input.disabled = false;
+      $('.send').disabled = false;
+    }
+  }
   renderChat();
   const voicePanel=document.createElement('details');voicePanel.className='voice-panel';voicePanel.id='voice-panel';voicePanel.innerHTML='<summary>Голосовой режим</summary><div class="voice-title">ГОЛОСОВОЙ ВВОД И ОТВЕТ</div><div class="voice-controls"><button class="voice-start" type="button"><span></span>Говорить</button><label for="voice-gender">Голос ответа</label><select id="voice-gender" aria-label="Голос ответа"><option value="female">Женский</option><option value="male">Мужской</option></select></div><div class="voice-status" aria-live="polite">Нажми «Говорить», скажи фразу и нажми ещё раз.</div><small class="voice-privacy">Запись до 25 секунд отправляется в Gemini для распознавания. LUMI не сохраняет аудиофайл.</small>';
   $('.composer').before(voicePanel);
