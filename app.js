@@ -182,6 +182,37 @@
     input.focus();
     resizeInput();
   }));
+  const sourceMarker = '\n\nИсточники · ';
+  function separateSources(text) {
+    const index = text.lastIndexOf(sourceMarker);
+    if (index < 0) return {body:text};
+    const [stamp,...lines] = text.slice(index+sourceMarker.length).split('\n');
+    if (!/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(stamp) || lines.length % 2) return {body:text};
+    const links = [];
+    for (let i=0;i<lines.length;i+=2) {
+      try {
+        const url=new URL(lines[i+1]);
+        if(url.protocol!=='https:') return {body:text};
+        links.push({title:lines[i],url:url.href});
+      } catch {return {body:text};}
+    }
+    return {body:text.slice(0,index),stamp,links};
+  }
+  function attachSources(row,details) {
+    if(!details.links?.length) return;
+    const block=document.createElement('div');
+    block.className='sources';
+    block.textContent='Источники · '+new Date(details.stamp).toLocaleString('ru-RU');
+    for (const {title,url} of details.links) {
+      const link=document.createElement('a');
+      link.textContent=title;link.href=url;link.target='_blank';link.rel='noopener noreferrer';
+      block.append(link);
+    }
+    row.append(block);
+  }
+  const prefs = $('#reply-prefs');
+  prefs.value=storage.read('replyPrefs','');
+  $('#save-prefs').onclick=()=>{storage.write('replyPrefs',prefs.value.trim());toast('Предпочтения сохранены');};
   function renderChat() {
     const list = dialogMessages(dialogId);
     $('#welcome').hidden = list.length > 0;
@@ -190,7 +221,9 @@
     for (const item of list.slice(-30)) {
       const row = document.createElement('div');
       row.className = 'message ' + (item.role === 'assistant' ? 'system' : 'user');
-      row.textContent = item.text;
+      const details=item.role==='assistant'?separateSources(item.text):{body:item.text};
+      row.textContent = details.body;
+      attachSources(row,details);
       if (item.thumb?.startsWith('data:image/jpeg;base64,')) {
         const image = new Image();
         image.className = 'chat-photo';
@@ -210,7 +243,8 @@
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   function revealReply(row, reply) {
     const scroll = $('#chat-scroll');
-    const letters = Array.from(reply);
+    const details=separateSources(reply);
+    const letters = Array.from(details.body);
     const duration = Math.min(4800, letters.length * 22);
     const start = performance.now();
     const text = document.createTextNode('');
@@ -227,7 +261,7 @@
       shown = count;
       if (follow) scroll.scrollTop = scroll.scrollHeight;
       if (shown < letters.length) requestAnimationFrame(frame);
-      else row.removeAttribute('aria-busy');
+      else {row.removeAttribute('aria-busy');attachSources(row,details);if(follow)scroll.scrollTop=scroll.scrollHeight;}
     }
     frame(start);
   }
@@ -261,8 +295,10 @@
       const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-16);
       const payload = {
         initData: tg?.initData || '',
-        messages: history.map(m => ({role: m.role, text: m.text || (m.thumb ? 'Фото' : '')}))
+        preferences: storage.read('replyPrefs',''),
+        messages: history.map(m => ({role: m.role, text: (m.role==='assistant'?separateSources(m.text).body.slice(0,4000):m.text) || (m.thumb ? 'Фото' : '')}))
       };
+      while(payload.messages.length>1 && new TextEncoder().encode(JSON.stringify(payload)).length>23500) payload.messages.shift();
       if (photo) payload.photo = photo.data;
       const path = photo ? '/chat/photo' : '/chat';
       const response = await fetch(API_ENDPOINT.replace(/\/$/, '') + path, {
@@ -276,11 +312,15 @@
       }
       const historyNow = dialogMessages(target);
       if (!historyNow.some(m => m.id === messages.at(-1).id)) return;
-      historyNow.push({id: uid(), role: 'assistant', text: data.reply, at: Date.now()});
+      let savedReply=data.reply;
+      if(data.sources?.length && data.checkedAt) {
+        savedReply+=sourceMarker+data.checkedAt+'\n'+data.sources.map(s=>s.title.replace(/\s+/g,' ')+'\n'+s.url).join('\n');
+      }
+      historyNow.push({id: uid(), role: 'assistant', text: savedReply, at: Date.now()});
       saveDialog(target, historyNow);
       scheduleSync();
       if (dialogId !== target) return;
-      if (row.isConnected) revealReply(row, data.reply);
+      if (row.isConnected) revealReply(row, savedReply);
       else { pending.delete(target); renderChat(); }
       if (fromVoice) speak(data.reply);
       voiceStatus.textContent = 'Ответ LUMI готов.';
@@ -460,7 +500,8 @@
   $('#clear-data').onclick = () => {
     if (!confirm('Удалить чаты, заметки и планы на этом устройстве?')) return;
     clearDialogs();
-    for (const key of ['tasks','notes']) localStorage.removeItem('lumi:'+key);
+    prefs.value='';
+    for (const key of ['tasks','notes','replyPrefs']) localStorage.removeItem('lumi:'+key);
     renderTasks(); renderNotes(); toast('Локальные данные удалены');
   };
   $('#map-form').addEventListener('submit',e=>{e.preventDefault();const q=$('#map-query').value.trim();if(q)window.open('https://yandex.ru/maps/?text='+encodeURIComponent(q),'_blank','noopener');});

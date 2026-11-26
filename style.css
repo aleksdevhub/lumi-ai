@@ -234,3 +234,8 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 #pc-settings { margin:20px 0; }
 #pc-settings p { font-size:14px; color:#bbb; }
 #pc-settings input { width:100%; padding:10px; font-size:16px; }
+#reply-settings { margin:20px 0; }
+#reply-settings label,#reply-settings small { display:block; margin:12px 0; }
+#reply-prefs { width:100%; padding:10px; font:16px/1.5 inherit; font-size:16px; }
+.sources { margin-top:12px; padding-top:9px; border-top:1px solid #444; color:#aaa; font-size:13px; white-space:normal; }
+.sources a { display:block; padding:4px 0; color:#ddd; overflow-wrap:anywhere; }

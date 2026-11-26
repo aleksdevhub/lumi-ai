@@ -1,3 +1,4 @@
+import {answer} from './assistant.js';
 import {PcRelay, matches} from './pc.js';
 export {PcRelay};
 const encoder = new TextEncoder();
@@ -43,7 +44,7 @@ export default {
     const allowed = origin === env.ALLOWED_ORIGIN ? origin : "";
     if (request.method === "OPTIONS") return allowed ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Lumi-Pair", "Access-Control-Max-Age": "86400", "Vary": "Origin" } }) : new Response(null, { status: 403 });
     const url = new URL(request.url);
-    if (request.method === "GET" && url.pathname === "/health") return response({ ok: true, service: "lumi-ai-api" }, 200, allowed);
+    if (request.method === "GET" && url.pathname === "/health") return response({ ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"] }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
         return response({error:'Unauthorized'},401);
@@ -179,29 +180,11 @@ export default {
     }
     if (!contents.length || contents.at(-1).role !== "user") return response({ error: "Send a message to begin" }, 400, allowed);
     if (photoRequest) contents.at(-1).parts.push({ inlineData: { mimeType: "image/jpeg", data: body.photo } });
-    const model = /^[a-zA-Z0-9._-]+$/.test(env.GEMINI_MODEL || "") ? env.GEMINI_MODEL : "gemini-3.5-flash-lite";
     try {
-      const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: "You are LUMI, a helpful personal assistant. Reply in the user's language, clearly and warmly. Do not claim to have capabilities or information you do not have. Do not ask for secrets or sensitive personal information." }] },
-          contents,
-          generationConfig: { maxOutputTokens: 700, temperature: 0.7 }
-        })
-      });
-      if (!upstream.ok) {
-        const err = await upstream.json().catch(() => ({}));
-        console.error("Gemini API error", upstream.status, err?.error?.status || "unknown");
-        return response({ error: upstream.status === 429 ? "Free model limit reached. Try again later." : "The model is temporarily unavailable." }, upstream.status === 429 ? 429 : 502, allowed);
-      }
-      const data = await upstream.json();
-      const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("").trim();
-      if (!text) return response({ error: "The model returned an empty response." }, 502, allowed);
-      return response({ reply: text }, 200, allowed);
+      const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0,500) : '';
+      return response(await answer(env,contents,preferences),200,allowed);
     } catch (error) {
-      console.error("Gemini connection error", error?.name || "unknown");
-      return response({ error: "Could not reach the model. Try again later." }, 502, allowed);
+      return response({error:error.status===429?'Достигнут лимит модели. Попробуй позже.':'Не удалось получить ответ от модели. Попробуй позже.'},error.status===429?429:502,allowed);
     }
   }
 };
