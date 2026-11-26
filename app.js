@@ -12,6 +12,64 @@
   $$('.map-shortcuts button').forEach((el,i)=>{el.innerHTML=svgIcon(['map','spark','spark'][i])+' '+el.textContent.replace('→','')+' '+svgIcon('arrow')});
   try { tg?.setHeaderColor('#101010'); tg?.setBackgroundColor('#101010'); } catch {}
   const storage = { read(k, fallback=[]) { try { return JSON.parse(localStorage.getItem('lumi:'+k)) ?? fallback; } catch { return fallback; } }, write(k,v) { localStorage.setItem('lumi:'+k,JSON.stringify(v)); } };
+  const prefix = 'lumi:dialog:';
+  const uid = () => crypto.randomUUID();
+  const legacy = storage.read('messages');
+  const legacyId = '00000000-0000-4000-8000-000000000001';
+  function dialogMessages(id) { return storage.read('dialog:' + id); }
+  function saveDialog(id, messages) { storage.write('dialog:' + id, messages.slice(-100)); }
+  if (legacy.length) {
+    if (!localStorage.getItem(prefix + legacyId)) {
+      saveDialog(legacyId, legacy.map(m => ({...m, id: uid()})));
+    }
+    localStorage.removeItem('lumi:messages');
+  }
+  let dialogId = storage.read('activeDialog', null) || (legacy.length ? legacyId : uid());
+  storage.write('activeDialog', dialogId);
+  const pending = new Set();
+  const drafts = new Map();
+  function dialogIds() {
+    return Object.keys(localStorage).filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length));
+  }
+  function recentList(container, limit) {
+    container.replaceChildren();
+    const rows = dialogIds().map(id => {
+      const ms = dialogMessages(id);
+      const first = ms.find(m => m.role === 'user');
+      return {id, title: first?.text || 'Фото', at: ms.at(-1)?.at || 0};
+    }).sort((a,b) => b.at - a.at);
+    for (const item of rows.slice(0, limit)) {
+      const b = document.createElement('button');
+      b.className = 'dialog-link';
+      b.textContent = item.title;
+      b.setAttribute('aria-current', String(dialogId === item.id));
+      b.onclick = () => openDialog(item.id);
+      container.append(b);
+    }
+    if (!rows.length) container.textContent = 'Здесь появятся твои чаты.';
+  }
+  function openDialog(id) {
+    if (preparingPhoto || activeRecorder || voicePending) return toast('Сначала закончи запись или подготовку вложения');
+    if (id !== dialogId) {
+      drafts.set(dialogId, {text: input.value, photo: draftPhoto});
+      dialogId = id;
+      storage.write('activeDialog', id);
+      input.value = drafts.get(id)?.text || '';
+      showPhoto(drafts.get(id)?.photo || null);
+      resizeInput();
+      voicePanel.open = false;
+      window.speechSynthesis?.cancel();
+    }
+    show('chat');
+    renderChat();
+    syncComposer();
+  }
+  function syncComposer() {
+    input.disabled = pending.has(dialogId);
+    $('.send').disabled = input.disabled;
+    $('#attach-photo').disabled = preparingPhoto || input.disabled;
+  }
+  $$('[data-new-chat]').forEach(button => button.onclick = () => openDialog(dialogMessages(dialogId).length || input.value || draftPhoto ? uid() : dialogId));
   const date = new Date();
   $('#today').textContent = new Intl.DateTimeFormat('ru-RU',{weekday:'long',day:'numeric',month:'long'}).format(date).toUpperCase();
   $('#day-long-date').textContent = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long'}).format(date).toUpperCase();
@@ -26,7 +84,7 @@
   fitViewport();
   const menu = $('#menu');
   const menuButton = $('#open-menu');
-  menuButton.addEventListener('click', () => menu.showModal());
+  menuButton.addEventListener('click', () => { recentList($('#recent-chats'), 12); menu.showModal(); });
   $('#close-menu').addEventListener('click', () => menu.close());
   menu.addEventListener('click', event => {
     if (event.target === menu && event.clientX > menu.getBoundingClientRect().right) menu.close();
@@ -125,7 +183,7 @@
     resizeInput();
   }));
   function renderChat() {
-    const list = storage.read('messages');
+    const list = dialogMessages(dialogId);
     $('#welcome').hidden = list.length > 0;
     const box = $('#messages');
     box.replaceChildren();
@@ -143,6 +201,10 @@
       box.append(row);
     }
     const scroll = $('#chat-scroll');
+    if (pending.has(dialogId)) {
+      const waiting = document.createElement('div');
+      waiting.className='message system waiting-turn'; waiting.textContent='Думаю…'; box.append(waiting);
+    }
     scroll.scrollTop = scroll.scrollHeight;
   }
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -171,9 +233,12 @@
   }
 
   async function sendMessage(text, fromVoice, photo = null) {
-    const messages = storage.read('messages');
-    messages.push({role: 'user', text, at: Date.now(), ...(photo && {thumb: photo.thumb})});
-    storage.write('messages', messages.slice(-100));
+    const target = dialogId;
+    if (pending.has(target)) return;
+    const messages = dialogMessages(target);
+    messages.push({id: uid(), role: 'user', text, at: Date.now(), ...(photo && {thumb: photo.thumb})});
+    try { saveDialog(target, messages); } catch { input.value=text; showPhoto(photo); toast('На устройстве недостаточно места для сообщения'); return; }
+    scheduleSync();
     renderChat();
     const box = $('#messages');
     box.lastElementChild?.classList.add('new-turn');
@@ -188,6 +253,7 @@
     row.innerHTML = 'Думаю<span class="waiting-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>';
     const scroll = $('#chat-scroll');
     scroll.scrollTop = scroll.scrollHeight;
+    pending.add(target);
     input.disabled = true;
     $('#attach-photo').disabled = true;
     $('.send').disabled = true;
@@ -208,26 +274,28 @@
       if (!response.ok || typeof data.reply !== 'string' || !data.reply.trim()) {
         throw new Error(data.error || 'Не удалось получить ответ');
       }
-      const historyNow = storage.read('messages');
-      if (!row.isConnected && !historyNow.some(m => m.at === messages.at(-1).at)) return;
-      historyNow.push({role: 'assistant', text: data.reply, at: Date.now()});
-      storage.write('messages', historyNow.slice(-100));
+      const historyNow = dialogMessages(target);
+      if (!historyNow.some(m => m.id === messages.at(-1).id)) return;
+      historyNow.push({id: uid(), role: 'assistant', text: data.reply, at: Date.now()});
+      saveDialog(target, historyNow);
+      scheduleSync();
+      if (dialogId !== target) return;
       if (row.isConnected) revealReply(row, data.reply);
-      else renderChat();
+      else { pending.delete(target); renderChat(); }
       if (fromVoice) speak(data.reply);
       voiceStatus.textContent = 'Ответ LUMI готов.';
     } catch (error) {
+      if (dialogId === target && !row.isConnected) { $('.waiting-turn')?.remove(); $('#messages').append(row); }
       row.textContent = error.message || 'Не удалось связаться с LUMI. Попробуй ещё раз.';
-      if (photo && row.isConnected) {
+      if (photo && row.isConnected && dialogId === target) {
         showPhoto(photo);
         input.value = text;
         resizeInput();
       }
       if (fromVoice && row.isConnected) speak(row.textContent);
     } finally {
-      input.disabled = false;
-      $('#attach-photo').disabled = preparingPhoto;
-      $('.send').disabled = false;
+      pending.delete(target);
+      syncComposer();
     }
   }
   renderChat();
@@ -237,13 +305,16 @@
   $('#composer-more').addEventListener('click',()=>{voicePanel.open=!voicePanel.open; if(voicePanel.open) voicePanel.scrollIntoView({block:'nearest',behavior:'smooth'});});
   const voiceStart=$('.voice-start'),voiceStatus=$('.voice-status');
   let activeRecorder=null,activeStream=null,recordedChunks=[],recordTimer=null,voiceRecordButton=null;
+  let voicePending = false;
   function finishRecording(){if(activeRecorder?.state==='recording')activeRecorder.stop();}
   async function toggleRecording(button,autoSend){
     if(activeRecorder?.state==='recording'){finishRecording();return;}
+    if (voicePending || pending.has(dialogId)) return;
     if(!API_ENDPOINT){voiceStatus.textContent='Сервер LUMI не настроен.';voicePanel.open=true;return;}
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){voiceStatus.textContent='Запись с микрофона не поддерживается в этом приложении. Открой LUMI в обновлённом Telegram.';voicePanel.open=true;return;}
     try{
       voicePanel.open=true;voiceStatus.textContent='Запрашиваю доступ к микрофону…';
+      voicePending=true;
       activeStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,channelCount:1}});
       const formats=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/mp4'];
       const mimeType=formats.find(type=>MediaRecorder.isTypeSupported(type));
@@ -258,6 +329,7 @@
         const blob=new Blob(recordedChunks,{type:recorder.mimeType||'audio/webm'});recordedChunks=[];
         if(blob.size<1200){voiceStatus.textContent='Запись слишком короткая. Нажми «Говорить» и произнеси фразу.';return;}
         if(blob.size>700000){voiceStatus.textContent='Запись длиннее 25 секунд. Попробуй сказать короче.';return;}
+        voicePending=true;
         voiceStatus.textContent='Распознаю речь…';
         try{
           const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';
@@ -266,12 +338,13 @@
           const result=await fetch(API_ENDPOINT.replace(/\/$/,'')+'/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:tg?.initData||'',mimeType:mime,audioBase64:btoa(binary)})});
           const data=await result.json();if(!result.ok)throw new Error(data.error||'Не удалось распознать речь.');
           if(autoSend)sendMessage(data.transcript,true);else{$('#chat-input').value=($('#chat-input').value+' '+data.transcript).trim();voiceStatus.textContent='Речь добавлена в сообщение.';$('#chat-input').focus();}
-        }catch(error){voiceStatus.textContent=error.message||'Не получилось обработать запись.';}
+        }catch(error){voiceStatus.textContent=error.message||'Не получилось обработать запись.';}finally{voicePending=false;}
       };
+      voicePending=false;
       activeRecorder.start();voiceStatus.textContent='Записываю… нажми ещё раз, чтобы закончить.';
       if(button===voiceStart){voiceStart.textContent='Остановить';}else{setIcon($('#voice'),'spark');$('#voice').setAttribute('aria-label','Остановить запись');}
       recordTimer=setTimeout(finishRecording,25000);
-    }catch(error){activeStream?.getTracks().forEach(track=>track.stop());activeStream=null;activeRecorder=null;voiceStart.disabled=false;$('#voice').disabled=false;voiceStart.textContent='Говорить';setIcon($('#voice'),'mic');voicePanel.open=true;voiceStatus.textContent=error?.name==='NotAllowedError'?'Telegram не дал доступ к микрофону. Разреши микрофон для Telegram в настройках телефона и попробуй снова.':'Не удалось включить микрофон. Проверь разрешения Telegram и повтори попытку.';}
+    }catch(error){voicePending=false;activeStream?.getTracks().forEach(track=>track.stop());activeStream=null;activeRecorder=null;voiceStart.disabled=false;$('#voice').disabled=false;voiceStart.textContent='Говорить';setIcon($('#voice'),'mic');voicePanel.open=true;voiceStatus.textContent=error?.name==='NotAllowedError'?'Telegram не дал доступ к микрофону. Разреши микрофон для Telegram в настройках телефона и попробуй снова.':'Не удалось включить микрофон. Проверь разрешения Telegram и повтори попытку.';}
   }
   voiceStart.addEventListener('click',()=>toggleRecording(voiceStart,true));
   function speak(text){if(!window.speechSynthesis){voiceStatus.textContent='Озвучка не поддерживается браузером.';return;}const gender=$('#voice-gender').value;const utterance=new SpeechSynthesisUtterance(text);utterance.lang='ru-RU';utterance.rate=1;utterance.pitch=gender==='female'?1.12:.88;const voices=speechSynthesis.getVoices();const matching=voices.find(v=>/^ru/i.test(v.lang)&&new RegExp(gender==='female'?'female|woman|милена|алёна|алена|ирина|жен':'male|man|павел|юрий|муж','i').test(v.name));if(matching)utterance.voice=matching;speechSynthesis.cancel();speechSynthesis.speak(utterance);}
@@ -280,9 +353,116 @@
   $('#task-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#task-input'),text=input.value.trim();if(!text)return;const tasks=storage.read('tasks');tasks.unshift({id:Date.now(),text,done:false});storage.write('tasks',tasks);input.value='';renderTasks()});renderTasks();
   function renderNotes(){const notes=storage.read('notes');const list=$('#notes-list');list.innerHTML='';if(!notes.length){list.innerHTML='<div class="empty">Здесь появятся сохранённые заметки.</div>';return;}notes.forEach(n=>{const row=document.createElement('div');row.className='entry';row.innerHTML='<span></span><button aria-label="Удалить заметку">×</button>';row.querySelector('span').textContent=n.text;const small=document.createElement('small');small.textContent=new Date(n.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});row.querySelector('span').append(small);row.querySelector('button').onclick=()=>{storage.write('notes',notes.filter(x=>x.id!==n.id));renderNotes()};list.append(row);});}
   $('#note-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#note-input'),text=input.value.trim();if(!text)return;const notes=storage.read('notes');notes.unshift({id:Date.now(),text,at:Date.now()});storage.write('notes',notes);input.value='';renderNotes();toast('Заметка сохранена')});renderNotes();
-  function renderHistory(){const list=$('#history-list');list.innerHTML='';const messages=storage.read('messages');if(!messages.length){list.innerHTML='<div class="empty">История появится после первого сообщения в чате.</div>';return;}messages.slice().reverse().forEach(m=>{const row=document.createElement('div');row.className='entry';const span=document.createElement('span');span.textContent=m.thumb ? (m.text ? "Фото · "+m.text : "Фото") : m.text;const small=document.createElement('small');small.textContent=new Date(m.at).toLocaleString('ru-RU');span.append(small);row.append(span);list.append(row);});}
-  $('#clear-history').addEventListener('click',()=>{storage.write('messages',[]);renderHistory();renderChat();toast('История очищена')});
-  $('#clear-data').addEventListener('click',()=>{if(confirm('Удалить все заметки, планы и сообщения LUMI на этом устройстве?')){['messages','tasks','notes'].forEach(k=>localStorage.removeItem('lumi:'+k));renderTasks();renderNotes();renderChat();toast('Локальные данные удалены')}});
+  const pcStatus = $('#pc-status');
+  const pcUserKey = 'sync:' + (tg?.initDataUnsafe?.user?.id || 'guest');
+  let connection = storage.read(pcUserKey, null);
+  let running = false, syncTimer, syncAgain = false;
+  const acknowledged = new Set();
+  function pcControls() {
+    $('#pc-forget').hidden = !connection;
+    $('#pc-code').parentElement.hidden = !!connection;
+  }
+  function disconnectPC() {
+    clearTimeout(syncTimer);
+    connection = null;
+    localStorage.removeItem('lumi:' + pcUserKey);
+    acknowledged.clear();
+    $('#pc-code').value = '';
+    pcStatus.textContent = 'Синхронизация выключена.';
+    pcControls();
+  }
+  function scheduleSync() {
+    if (!connection) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncPC, 800);
+  }
+  async function syncPC() {
+    if (running) { syncAgain = true; return; }
+    if (!tg?.initData) { pcStatus.textContent = 'Открой LUMI через Telegram.'; return; }
+    const session = connection || {code:$('#pc-code').value.trim(), after:0};
+    if (!/^[0-9a-f]{48}$/i.test(session.code)) {pcStatus.textContent='Введи код из файла pair.txt на ПК.'; return;}
+    connection = session;
+    running = true;
+    pcStatus.textContent = 'Подключаюсь к ПК…';
+    try {
+      const upload = [];
+      for (const id of dialogIds()) {
+        for (const m of dialogMessages(id)) {
+          if (!acknowledged.has(m.id)) upload.push({...m, dialog:id});
+        }
+      }
+      let pos = 0, more;
+      do {
+        const batch = [];
+        let size = 0;
+        while (pos < upload.length && batch.length < 50) {
+          const next = new TextEncoder().encode(JSON.stringify(upload[pos])).length;
+          if (batch.length && size + next > 145000) break;
+          batch.push(upload[pos++]); size += next;
+        }
+        const res = await fetch(API_ENDPOINT.replace(/\/$/,'')+'/dialogs/sync',{
+          method:'POST', headers:{'Content-Type':'application/json','X-Lumi-Pair':session.code},
+          body:JSON.stringify({initData:tg.initData,after:session.after,items:batch})
+        });
+        if (connection !== session) return;
+        const data = await res.json();
+        if (!res.ok) {
+          if(res.status===403) disconnectPC();
+          throw Error(data.error || 'Синхронизация временно недоступна.');
+        }
+        let visibleChanged = false;
+        for (const {dialog,seq,...message} of data.rows) {
+          const local = dialogMessages(dialog);
+          if (!local.some(m => m.id === message.id)) {
+            local.push(message);
+            local.sort((a,b)=>a.at-b.at);
+            saveDialog(dialog, local);
+            if (dialog===dialogId) visibleChanged=true;
+          }
+          acknowledged.add(message.id);
+          session.after = seq;
+        }
+        for (const m of batch) acknowledged.add(m.id);
+        storage.write(pcUserKey, session);
+        if(visibleChanged && !pending.has(dialogId)) renderChat();
+        more = data.more;
+      } while (connection===session && (pos < upload.length || more));
+      $('#pc-code').value='';
+      pcStatus.textContent='Сохранено в SQL Server · '+new Date().toLocaleTimeString('ru-RU');
+      if(current==='history') renderHistory();
+      if(menu.open) recentList($('#recent-chats'),12);
+    } catch (error) {
+      pcStatus.textContent=error.message || 'Компьютер сейчас недоступен.';
+      if(!storage.read(pcUserKey,null)) connection=null;
+    } finally {
+      running=false; pcControls();
+      if(syncAgain){syncAgain=false;scheduleSync();}
+    }
+  }
+  $('#pc-forget').onclick=disconnectPC;
+  $('#pc-sync').onclick=syncPC;
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden) scheduleSync();});
+  pcControls();
+  scheduleSync();
+  function renderHistory(){ recentList($('#history-list'), Infinity); }
+  function clearDialogs() {
+    disconnectPC();
+    for (const id of dialogIds()) localStorage.removeItem(prefix + id);
+    drafts.clear();
+    dialogId = uid();
+    storage.write('activeDialog', dialogId);
+    input.value = ''; showPhoto(null); resizeInput();
+    renderChat(); renderHistory(); syncComposer();
+  }
+  $('#clear-history').onclick = () => {
+    if (confirm('Удалить все чаты на этом устройстве и отключить синхронизацию?')) clearDialogs();
+  };
+  $('#clear-data').onclick = () => {
+    if (!confirm('Удалить чаты, заметки и планы на этом устройстве?')) return;
+    clearDialogs();
+    for (const key of ['tasks','notes']) localStorage.removeItem('lumi:'+key);
+    renderTasks(); renderNotes(); toast('Локальные данные удалены');
+  };
   $('#map-form').addEventListener('submit',e=>{e.preventDefault();const q=$('#map-query').value.trim();if(q)window.open('https://yandex.ru/maps/?text='+encodeURIComponent(q),'_blank','noopener');});
   $$('[data-map]').forEach(b=>b.addEventListener('click',()=>window.open('https://yandex.ru/maps/?text='+encodeURIComponent(b.dataset.map+' рядом'),'_blank','noopener')));
   $('#locate').addEventListener('click',()=>{if(!navigator.geolocation){toast('Геопозиция не поддерживается');return;}$('#weather-place').textContent='Определяю местоположение…';navigator.geolocation.getCurrentPosition(async p=>{try{const {latitude,longitude}=p.coords;const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`);if(!r.ok)throw Error();const d=await r.json(),c=d.current;$('#temperature').textContent=Math.round(c.temperature_2m)+'°';$('#weather-place').textContent='Рядом с тобой';$('#weather-detail').textContent=`Ощущается как ${Math.round(c.apparent_temperature)}° · сегодня ${Math.round(d.daily.temperature_2m_min[0])}° / ${Math.round(d.daily.temperature_2m_max[0])}°`;$('#weather-icon').textContent=c.weather_code===0?'☼':c.weather_code<60?'◒':'☂';}catch{$('#weather-place').textContent='Прогноз временно недоступен';toast('Не удалось загрузить погоду')}},()=>{$('#weather-place').textContent='Нет доступа к геопозиции';toast('Разреши доступ к геопозиции в браузере')},{timeout:10000});});

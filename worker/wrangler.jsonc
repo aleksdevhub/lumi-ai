@@ -4,7 +4,11 @@
   "main": "src/index.js",
   "compatibility_date": "2026-11-26",
   "workers_dev": true,
+  "durable_objects": {"bindings":[{"name":"PC_RELAY","class_name":"PcRelay"}]},
+  "migrations": [{"tag":"pc-relay-v1","new_sqlite_classes":["PcRelay"]}],
   "vars": {
+    "PC_HASH": "de5c36078a9794c01bb22b964ee53227fb4e506e4ff9f19be1dd78fb8791fa87",
+    "PAIR_HASH": "c16a9bb8275ef9c8b200dc80a48dbdd8031f1c33c24df041cb4e9f82a6d75ad4",
     "GEMINI_MODEL": "gemini-3.5-flash-lite",
     "ALLOWED_ORIGIN": "https://aleksdevhub.github.io"
   }

@@ -226,3 +226,11 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 .chat-photo { display: block; width: auto; height: auto; max-width: min(100%, 180px); max-height: 180px; border-radius: 10px; }
 .message.user:has(.chat-photo) { min-width: min(150px, 85%); }
 .chat-photo:not(:last-child) { margin-bottom: 5px; }
+.new-chat,.dialog-link { width:100%; min-height:44px; padding:10px 12px; text-align:left; color:inherit; background:none; border:0; border-radius:12px; font:inherit; }
+.new-chat { border:1px solid #474747; margin:8px 0; font-weight:600; }
+.dialog-link { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dialog-link[aria-current="true"] { background:#303030; }
+.recent-heading { margin:24px 12px 6px; color:#aaa; font-size:14px; }
+#pc-settings { margin:20px 0; }
+#pc-settings p { font-size:14px; color:#bbb; }
+#pc-settings input { width:100%; padding:10px; font-size:16px; }

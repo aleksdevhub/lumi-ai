@@ -1,3 +1,5 @@
+import {PcRelay, matches} from './pc.js';
+export {PcRelay};
 const encoder = new TextEncoder();
 const recent = new Map();
 
@@ -6,7 +8,7 @@ function response(data, status, origin) {
   if (origin) {
     headers["Access-Control-Allow-Origin"] = origin;
     headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS";
-    headers["Access-Control-Allow-Headers"] = "Content-Type";
+    headers["Access-Control-Allow-Headers"] = "Content-Type, X-Lumi-Pair";
     headers["Access-Control-Max-Age"] = "86400";
   }
   return new Response(JSON.stringify(data), { status, headers });
@@ -39,10 +41,42 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
     const allowed = origin === env.ALLOWED_ORIGIN ? origin : "";
-    if (request.method === "OPTIONS") return allowed ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400", "Vary": "Origin" } }) : new Response(null, { status: 403 });
+    if (request.method === "OPTIONS") return allowed ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Lumi-Pair", "Access-Control-Max-Age": "86400", "Vary": "Origin" } }) : new Response(null, { status: 403 });
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") return response({ ok: true, service: "lumi-ai-api" }, 200, allowed);
+    if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
+        return response({error:'Unauthorized'},401);
+      const relay=env.PC_RELAY.get(env.PC_RELAY.idFromName('home'));
+      return relay.fetch('https://relay/connect',{headers:{Upgrade:'websocket'}});
+    }
+    if (url.pathname === '/pc/status' && request.method === 'POST') {
+      if (!await matches(request.headers.get('X-Lumi-Pair'),env.PAIR_HASH)) return response({error:'Unauthorized'},403);
+      const relay=env.PC_RELAY.get(env.PC_RELAY.idFromName('home'));
+      const result=await relay.fetch('https://relay/sync',{method:'POST',body:JSON.stringify({user:'0',after:0,items:[]})});
+      return response({databaseReady:result.ok},result.status);
+    }
     if (!allowed) return response({ error: "Origin not allowed" }, 403);
+    if (request.method === 'POST' && url.pathname === '/dialogs/sync') {
+      if (!await matches(request.headers.get('X-Lumi-Pair'),env.PAIR_HASH)) return response({error:'Проверь код подключения.'},403,allowed);
+      if (Number(request.headers.get('Content-Length')) > 180000) return response({error:'Пакет слишком большой'},413,allowed);
+      const raw=await request.text();
+      if(raw.length>180000) return response({error:'Пакет слишком большой'},413,allowed);
+      let body;
+      try {body=JSON.parse(raw);} catch {return response({error:'Некорректный запрос'},400,allowed);}
+      const user=await verifyTelegram(body?.initData,env.TELEGRAM_BOT_TOKEN);
+      if(!user?.id) return response({error:'Открой LUMI через Telegram.'},401,allowed);
+      const items=body.items;
+      const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+      if(!Array.isArray(items)||items.length>50||!Number.isSafeInteger(body.after)||body.after<0||
+        items.some(m=>!m||!uuid.test(m.dialog)||!uuid.test(m.id)||!['user','assistant'].includes(m.role)||
+          typeof m.text!=='string'||m.text.length>20000||!Number.isSafeInteger(m.at)||
+          (m.thumb!=null && (typeof m.thumb!=='string'||m.thumb.length>100000||!m.thumb.startsWith('data:image/jpeg;base64,')))))
+        return response({error:'Некорректные данные диалога'},400,allowed);
+      const relay=env.PC_RELAY.get(env.PC_RELAY.idFromName('home'));
+      const result=await relay.fetch('https://relay/sync',{method:'POST',body:JSON.stringify({user:String(user.id),after:body.after,items})});
+      return response(await result.json(),result.status,allowed);
+    }
     if (request.method === "POST" && url.pathname === "/transcribe") {
       const length = Number(request.headers.get("Content-Length") || 0);
       if (length > 1000000) return response({ error: "Запись слишком длинная. Попробуй ещё раз короче." }, 413, allowed);
