@@ -94,15 +94,29 @@ export default {
         return response({ error: "Не удалось связаться с сервисом распознавания." }, 502, allowed);
       }
     }
-    if (request.method !== "POST" || url.pathname !== "/chat") return response({ error: "Not found" }, 404, allowed);
+    const photoRequest = url.pathname === "/chat/photo";
+    if (request.method !== "POST" || (!photoRequest && url.pathname !== "/chat")) return response({ error: "Not found" }, 404, allowed);
+    const maxBody = photoRequest ? 1650000 : 24000;
     const length = Number(request.headers.get("Content-Length") || 0);
-    if (length > 24000) return response({ error: "Message is too large" }, 413, allowed);
+    if (length > maxBody) return response({ error: "Слишком большой запрос" }, 413, allowed);
     if (!env.GEMINI_API_KEY || !env.TELEGRAM_BOT_TOKEN) return response({ error: "Backend secrets are not configured" }, 503, allowed);
     let body;
     try {
-      const raw = await request.text();
-      if (encoder.encode(raw).byteLength > 24000) return response({ error: "Message is too large" }, 413, allowed);
-      body = JSON.parse(raw);
+      const reader = request.body.getReader();
+      const decoder = new TextDecoder();
+      let size = 0, raw = "";
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxBody) {
+          await reader.cancel();
+          return response({ error: "Слишком большой запрос" }, 413, allowed);
+        }
+        raw += decoder.decode(value, {stream: true});
+      }
+      body = JSON.parse(raw + decoder.decode());
+      if (!body || typeof body !== "object") throw Error();
     } catch { return response({ error: "Invalid JSON" }, 400, allowed); }
     const user = await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN);
     if (!user?.id) return response({ error: "Open LUMI from Telegram to chat" }, 401, allowed);
@@ -113,12 +127,24 @@ export default {
     times.push(now); recent.set(key, times);
     if (recent.size > 10000) for (const [id, list] of recent) if (!list.some(t => now - t < 60000)) recent.delete(id);
     const messages = Array.isArray(body.messages) ? body.messages.slice(-16) : [];
+    if (photoRequest) {
+      const photo = body.photo;
+      const last = messages.at(-1);
+      if (typeof photo !== "string" || photo.length > 1500000 || photo.length < 16 ||
+          photo.length % 4 !== 0 || !photo.startsWith("/9j/") || !/^[A-Za-z0-9+/]+={0,2}$/.test(photo)) {
+        return response({ error: "Не удалось прочитать фото. Выбери его ещё раз." }, 400, allowed);
+      }
+      if (last?.role !== "user" || typeof last.text !== "string" || !last.text.trim() || last.text.length > 4000) {
+        return response({ error: "Некорректная подпись к фото" }, 400, allowed);
+      }
+    }
     const contents = [];
     for (const item of messages) {
       if (!item || !["user", "assistant"].includes(item.role) || typeof item.text !== "string" || !item.text.trim() || item.text.length > 4000) continue;
       contents.push({ role: item.role === "assistant" ? "model" : "user", parts: [{ text: item.text.trim() }] });
     }
     if (!contents.length || contents.at(-1).role !== "user") return response({ error: "Send a message to begin" }, 400, allowed);
+    if (photoRequest) contents.at(-1).parts.push({ inlineData: { mimeType: "image/jpeg", data: body.photo } });
     const model = /^[a-zA-Z0-9._-]+$/.test(env.GEMINI_MODEL || "") ? env.GEMINI_MODEL : "gemini-3.5-flash-lite";
     try {
       const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {

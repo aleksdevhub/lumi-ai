@@ -218,3 +218,11 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 .waiting-dots i { font-style: normal; }
 @keyframes lumi-appear { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lumi-dot { 0%, 70%, 100% { opacity: .35; } 35% { opacity: 1; } }
+
+#photo-preview { display: flex; align-items: center; gap: 10px; padding: 2px 6px 10px; }
+#photo-preview img { width: 52px; height: 52px; border-radius: 9px; object-fit: cover; }
+#photo-preview small { flex: 1; color: #bcbcbc; font-size: 13px; }
+#remove-photo { font-size: 21px; }
+.chat-photo { display: block; width: auto; height: auto; max-width: min(100%, 180px); max-height: 180px; border-radius: 10px; }
+.message.user:has(.chat-photo) { min-width: min(150px, 85%); }
+.chat-photo:not(:last-child) { margin-bottom: 5px; }

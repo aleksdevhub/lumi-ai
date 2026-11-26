@@ -53,7 +53,66 @@
   $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.tab,b.dataset.tab)));
   $$('[data-open]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.open,b.dataset.open==='chat'?'chat':'services')));
   $$('[data-back]').forEach(b=>b.addEventListener('click',()=>show(previous,previous==='home'?'home':'services')));
-  $('#chat-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#chat-input'),value=input.value.trim();if(!value)return;input.value='';resizeInput();sendMessage(value,false);});
+  const photoFile = $('#photo-file');
+  const preview = $('#photo-preview');
+  let draftPhoto = null;
+  let preparingPhoto = false;
+  function showPhoto(photo) {
+    draftPhoto = photo;
+    preview.hidden = !photo;
+    const image = preview.querySelector('img');
+    if (photo) image.src = photo.thumb;
+    else image.removeAttribute('src');
+  }
+  function jpeg(image, limit, quality) {
+    const scale = Math.min(1, limit / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+  $('#attach-photo').onclick = () => photoFile.click();
+  $('#remove-photo').onclick = () => showPhoto(null);
+  photoFile.onchange = async () => {
+    const file = photoFile.files[0];
+    photoFile.value = '';
+    if (!file) return;
+    if (file.size > 24 * 1024 * 1024) return toast('Выбери фото до 24 МБ');
+    preparingPhoto = true;
+    $('#attach-photo').disabled = true;
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      let data = jpeg(image, 1600, 0.8);
+      if (data.length > 1500000) data = jpeg(image, 1080, 0.65);
+      if (!data.startsWith('data:image/jpeg;base64,') || data.length > 1500000) throw Error();
+      showPhoto({data: data.split(',')[1], thumb: jpeg(image, 180, 0.62)});
+    } catch {
+      toast('Не удалось открыть фото. Попробуй JPEG или PNG.');
+    } finally {
+      URL.revokeObjectURL(url);
+      preparingPhoto = false;
+      $('#attach-photo').disabled = input.disabled;
+    }
+  };
+  $('#chat-form').addEventListener('submit', event => {
+    event.preventDefault();
+    if (preparingPhoto) return toast('Фото готовится…');
+    const caption = input.value.trim();
+    if (input.disabled || (!caption && !draftPhoto)) return;
+    if (caption.length > 4000) return toast('Сообщение должно быть короче 4001 символа');
+    const photo = draftPhoto;
+    showPhoto(null);
+    input.value = '';
+    resizeInput();
+    sendMessage(caption, false, photo);
+  });
   const input = $('#chat-input');
   function resizeInput() {
     input.style.height = 'auto';
@@ -74,6 +133,13 @@
       const row = document.createElement('div');
       row.className = 'message ' + (item.role === 'assistant' ? 'system' : 'user');
       row.textContent = item.text;
+      if (item.thumb?.startsWith('data:image/jpeg;base64,')) {
+        const image = new Image();
+        image.className = 'chat-photo';
+        image.alt = 'Прикреплённое фото';
+        image.src = item.thumb;
+        row.prepend(image);
+      }
       box.append(row);
     }
     const scroll = $('#chat-scroll');
@@ -104,9 +170,9 @@
     frame(start);
   }
 
-  async function sendMessage(text, fromVoice) {
+  async function sendMessage(text, fromVoice, photo = null) {
     const messages = storage.read('messages');
-    messages.push({role: 'user', text, at: Date.now()});
+    messages.push({role: 'user', text, at: Date.now(), ...(photo && {thumb: photo.thumb})});
     storage.write('messages', messages.slice(-100));
     renderChat();
     const box = $('#messages');
@@ -123,13 +189,20 @@
     const scroll = $('#chat-scroll');
     scroll.scrollTop = scroll.scrollHeight;
     input.disabled = true;
+    $('#attach-photo').disabled = true;
     $('.send').disabled = true;
     try {
       const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-16);
-      const response = await fetch(API_ENDPOINT.replace(/\/$/, '') + '/chat', {
+      const payload = {
+        initData: tg?.initData || '',
+        messages: history.map(m => ({role: m.role, text: m.text || (m.thumb ? 'Фото' : '')}))
+      };
+      if (photo) payload.photo = photo.data;
+      const path = photo ? '/chat/photo' : '/chat';
+      const response = await fetch(API_ENDPOINT.replace(/\/$/, '') + path, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({initData: tg?.initData || '', messages: history.map(({role, text}) => ({role, text}))})
+        body: JSON.stringify(payload)
       });
       const data = await response.json();
       if (!response.ok || typeof data.reply !== 'string' || !data.reply.trim()) {
@@ -145,9 +218,15 @@
       voiceStatus.textContent = 'Ответ LUMI готов.';
     } catch (error) {
       row.textContent = error.message || 'Не удалось связаться с LUMI. Попробуй ещё раз.';
+      if (photo && row.isConnected) {
+        showPhoto(photo);
+        input.value = text;
+        resizeInput();
+      }
       if (fromVoice && row.isConnected) speak(row.textContent);
     } finally {
       input.disabled = false;
+      $('#attach-photo').disabled = preparingPhoto;
       $('.send').disabled = false;
     }
   }
@@ -201,7 +280,7 @@
   $('#task-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#task-input'),text=input.value.trim();if(!text)return;const tasks=storage.read('tasks');tasks.unshift({id:Date.now(),text,done:false});storage.write('tasks',tasks);input.value='';renderTasks()});renderTasks();
   function renderNotes(){const notes=storage.read('notes');const list=$('#notes-list');list.innerHTML='';if(!notes.length){list.innerHTML='<div class="empty">Здесь появятся сохранённые заметки.</div>';return;}notes.forEach(n=>{const row=document.createElement('div');row.className='entry';row.innerHTML='<span></span><button aria-label="Удалить заметку">×</button>';row.querySelector('span').textContent=n.text;const small=document.createElement('small');small.textContent=new Date(n.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});row.querySelector('span').append(small);row.querySelector('button').onclick=()=>{storage.write('notes',notes.filter(x=>x.id!==n.id));renderNotes()};list.append(row);});}
   $('#note-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#note-input'),text=input.value.trim();if(!text)return;const notes=storage.read('notes');notes.unshift({id:Date.now(),text,at:Date.now()});storage.write('notes',notes);input.value='';renderNotes();toast('Заметка сохранена')});renderNotes();
-  function renderHistory(){const list=$('#history-list');list.innerHTML='';const messages=storage.read('messages');if(!messages.length){list.innerHTML='<div class="empty">История появится после первого сообщения в чате.</div>';return;}messages.slice().reverse().forEach(m=>{const row=document.createElement('div');row.className='entry';const span=document.createElement('span');span.textContent=m.text;const small=document.createElement('small');small.textContent=new Date(m.at).toLocaleString('ru-RU');span.append(small);row.append(span);list.append(row);});}
+  function renderHistory(){const list=$('#history-list');list.innerHTML='';const messages=storage.read('messages');if(!messages.length){list.innerHTML='<div class="empty">История появится после первого сообщения в чате.</div>';return;}messages.slice().reverse().forEach(m=>{const row=document.createElement('div');row.className='entry';const span=document.createElement('span');span.textContent=m.thumb ? (m.text ? "Фото · "+m.text : "Фото") : m.text;const small=document.createElement('small');small.textContent=new Date(m.at).toLocaleString('ru-RU');span.append(small);row.append(span);list.append(row);});}
   $('#clear-history').addEventListener('click',()=>{storage.write('messages',[]);renderHistory();renderChat();toast('История очищена')});
   $('#clear-data').addEventListener('click',()=>{if(confirm('Удалить все заметки, планы и сообщения LUMI на этом устройстве?')){['messages','tasks','notes'].forEach(k=>localStorage.removeItem('lumi:'+k));renderTasks();renderNotes();renderChat();toast('Локальные данные удалены')}});
   $('#map-form').addEventListener('submit',e=>{e.preventDefault();const q=$('#map-query').value.trim();if(q)window.open('https://yandex.ru/maps/?text='+encodeURIComponent(q),'_blank','noopener');});
