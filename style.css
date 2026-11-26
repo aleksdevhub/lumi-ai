@@ -43,3 +43,4 @@ svg{width:18px;height:18px;display:block;flex:none}.tab span svg{width:19px;heig
 .composer .send svg{width:19px;height:19px;stroke-width:2.1;}
 .composer:focus-within{border-color:#505050;}
 .composer-more:focus-visible,.composer button:focus-visible{outline:2px solid #888;outline-offset:2px;}
+.voice-privacy{display:block;margin-top:8px;color:#777;font-size:9px;line-height:1.5;}

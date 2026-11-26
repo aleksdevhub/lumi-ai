@@ -43,6 +43,57 @@ export default {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") return response({ ok: true, service: "lumi-ai-api" }, 200, allowed);
     if (!allowed) return response({ error: "Origin not allowed" }, 403);
+    if (request.method === "POST" && url.pathname === "/transcribe") {
+      const length = Number(request.headers.get("Content-Length") || 0);
+      if (length > 1000000) return response({ error: "Запись слишком длинная. Попробуй ещё раз короче." }, 413, allowed);
+      if (!env.GEMINI_API_KEY || !env.TELEGRAM_BOT_TOKEN) return response({ error: "Backend secrets are not configured" }, 503, allowed);
+      let body;
+      try {
+        const raw = await request.text();
+        if (encoder.encode(raw).byteLength > 1000000) return response({ error: "Запись слишком длинная. Попробуй ещё раз короче." }, 413, allowed);
+        body = JSON.parse(raw);
+      } catch { return response({ error: "Не удалось прочитать запись." }, 400, allowed); }
+      const user = await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN);
+      if (!user?.id) return response({ error: "Открой LUMI через Telegram и разреши доступ к микрофону." }, 401, allowed);
+      const now = Date.now();
+      const key = String(user.id);
+      const times = (recent.get(key) || []).filter(t => now - t < 60000);
+      if (times.length >= 12) return response({ error: "Слишком много запросов. Подожди минуту." }, 429, allowed);
+      times.push(now); recent.set(key, times);
+      const supportedTypes = new Set(["audio/webm", "audio/ogg", "audio/mp4", "audio/m4a", "audio/wav", "audio/aac", "audio/mpeg"]);
+      const mimeType = String(body.mimeType || "").split(";")[0].toLowerCase();
+      const audio = body.audioBase64;
+      if (!supportedTypes.has(mimeType) || typeof audio !== "string" || audio.length < 16 || audio.length > 900000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(audio)) {
+        return response({ error: "Не получилось обработать запись. Попробуй записать ещё раз." }, 400, allowed);
+      }
+      const geminiMimeType = mimeType === "audio/mp4" ? "audio/m4a" : mimeType;
+      const model = /^[a-zA-Z0-9._-]+$/.test(env.GEMINI_MODEL || "") ? env.GEMINI_MODEL : "gemini-3.5-flash-lite";
+      try {
+        const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [
+              { text: "Точно расшифруй речь из этой короткой голосовой записи. Верни только распознанные слова без пояснений и кавычек. Сохрани язык оригинала." },
+              { inlineData: { mimeType: geminiMimeType, data: audio } }
+            ] }],
+            generationConfig: { maxOutputTokens: 300, temperature: 0 }
+          })
+        });
+        if (!upstream.ok) {
+          const err = await upstream.json().catch(() => ({}));
+          console.error("Gemini transcription error", upstream.status, err?.error?.status || "unknown");
+          return response({ error: upstream.status === 429 ? "Достигнут бесплатный лимит распознавания. Попробуй позже." : "Не удалось распознать запись. Попробуй ещё раз." }, upstream.status === 429 ? 429 : 502, allowed);
+        }
+        const data = await upstream.json();
+        const transcript = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("").trim();
+        if (!transcript) return response({ error: "Речь не распознана. Попробуй сказать ещё раз чуть ближе к микрофону." }, 422, allowed);
+        return response({ transcript }, 200, allowed);
+      } catch (error) {
+        console.error("Gemini transcription connection error", error?.name || "unknown");
+        return response({ error: "Не удалось связаться с сервисом распознавания." }, 502, allowed);
+      }
+    }
     if (request.method !== "POST" || url.pathname !== "/chat") return response({ error: "Not found" }, 404, allowed);
     const length = Number(request.headers.get("Content-Length") || 0);
     if (length > 24000) return response({ error: "Message is too large" }, 413, allowed);
