@@ -41,7 +41,7 @@ BEGIN
     LOWER(CONVERT(VARCHAR(36),DialogId)) AS dialog, LOWER(CONVERT(VARCHAR(36),MessageId)) AS id,
     Role AS role, Body AS [text], SentAtMs AS at, Thumbnail AS thumb
     FROM dbo.ChatMessages WHERE TelegramUserId=@owner AND SequenceId>@after ORDER BY SequenceId FOR JSON PATH);
-  DECLARE @bytes VARBINARY(MAX)=CONVERT(VARBINARY(MAX),@result);
+  DECLARE @bytes VARBINARY(MAX)=CONVERT(VARBINARY(MAX),COALESCE(@result,N'[]'));
   SELECT CAST('' AS XML).value('xs:base64Binary(sql:variable("@bytes"))','varchar(max)');
 END;
 GO
