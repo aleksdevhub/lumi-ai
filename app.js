@@ -5,7 +5,7 @@
   const iconPaths={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',chat:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 4a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>',map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15m6-12v15"/>',note:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/>',news:'<path d="M4 4h16v16H4z"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/>',mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/>',send:'<path d="M12 19V5m-7 7 7-7 7 7"/>',arrow:'<path d="M7 17 17 7M7 7h10v10"/>',spark:'<path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/><path d="m19 14 1.2 2.8L23 18l-2.8 1.2L19 22l-1.2-2.8L15 18l2.8-1.2z"/>'};
   function svgIcon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name]||iconPaths.spark}</svg>`}
   function setIcon(el,name){if(el)el.innerHTML=svgIcon(name)}
-  $('[data-icon]').forEach(element => setIcon(element, element.dataset.icon));
+  $$('[data-icon]').forEach(element => setIcon(element, element.dataset.icon));
   $$('.service-icon').forEach((el,i)=>setIcon(el,['sun','map','note','news'][i]));
   $$('.service-list>button>span').forEach((el,i)=>setIcon(el,['sun','map','note','calendar','history','news'][i]));
   setIcon($('.ask-icon'),'chat');setIcon($('.send'),'send');setIcon($('.voice'),'mic');
@@ -37,8 +37,8 @@
     if (id === current) return;
     previous = current;
     current = id;
-    $('.view').forEach(view => view.classList.toggle('active', view.id === id));
-    $('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === id));
+    $$('.view').forEach(view => view.classList.toggle('active', view.id === id));
+    $$('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === id));
     document.querySelector('main').scrollTop = 0;
     const back = $('#' + id + ' [data-back] span');
     if (back) back.textContent = 'Назад';
@@ -60,7 +60,7 @@
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
   }
   input.addEventListener('input', resizeInput);
-  $('.suggestions button').forEach(button => button.addEventListener('click', () => {
+  $$('.suggestions button').forEach(button => button.addEventListener('click', () => {
     input.value = button.dataset.prompt;
     input.focus();
     resizeInput();
