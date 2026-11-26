@@ -5,30 +5,85 @@
   const iconPaths={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',chat:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 4a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>',map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15m6-12v15"/>',note:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/>',news:'<path d="M4 4h16v16H4z"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/>',mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/>',send:'<path d="M12 19V5m-7 7 7-7 7 7"/>',arrow:'<path d="M7 17 17 7M7 7h10v10"/>',spark:'<path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/><path d="m19 14 1.2 2.8L23 18l-2.8 1.2L19 22l-1.2-2.8L15 18l2.8-1.2z"/>'};
   function svgIcon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name]||iconPaths.spark}</svg>`}
   function setIcon(el,name){if(el)el.innerHTML=svgIcon(name)}
-  $$('.tab').forEach((el,i)=>setIcon(el.querySelector('span'),['home','chat','grid','user'][i]));
+  $('[data-icon]').forEach(element => setIcon(element, element.dataset.icon));
   $$('.service-icon').forEach((el,i)=>setIcon(el,['sun','map','note','news'][i]));
   $$('.service-list>button>span').forEach((el,i)=>setIcon(el,['sun','map','note','calendar','history','news'][i]));
   setIcon($('.ask-icon'),'chat');setIcon($('.send'),'send');setIcon($('.voice'),'mic');
   $$('.map-shortcuts button').forEach((el,i)=>{el.innerHTML=svgIcon(['map','spark','spark'][i])+' '+el.textContent.replace('→','')+' '+svgIcon('arrow')});
-  try { tg?.setHeaderColor('#080808'); tg?.setBackgroundColor('#080808'); } catch {}
+  try { tg?.setHeaderColor('#101010'); tg?.setBackgroundColor('#101010'); } catch {}
   const storage = { read(k, fallback=[]) { try { return JSON.parse(localStorage.getItem('lumi:'+k)) ?? fallback; } catch { return fallback; } }, write(k,v) { localStorage.setItem('lumi:'+k,JSON.stringify(v)); } };
   const date = new Date();
   $('#today').textContent = new Intl.DateTimeFormat('ru-RU',{weekday:'long',day:'numeric',month:'long'}).format(date).toUpperCase();
   $('#day-long-date').textContent = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long'}).format(date).toUpperCase();
-  const user = tg?.initDataUnsafe?.user; if (user) { $('#profile-name').textContent = user.first_name || 'Привет'; $('.avatar').textContent = (user.first_name||'L')[0].toUpperCase(); }
-  let current='home',previous='services',toastTimer;
-  function show(id, tab=id) { const target=$('#'+id); if(!target) return; if(!['weather','maps','notes','day','history','news'].includes(id)) previous=id==='home'?'home':'services'; current=id; $$('.view').forEach(v=>v.classList.toggle('active',v.id===id)); $$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab)); window.scrollTo({top:0,behavior:'smooth'}); if(id==='history') renderHistory(); if(id==='news') loadNews(); if(id==='notes') renderNotes(); if(id==='day') renderTasks(); }
+  const user = tg?.initDataUnsafe?.user; if (user) { $('#profile-name').textContent = user.first_name || 'Привет'; }
+  const viewport = window.visualViewport;
+  function fitViewport() {
+    if (viewport && viewport.scale === 1) {
+      document.documentElement.style.setProperty('--visible-height', viewport.height + 'px');
+    }
+  }
+  viewport?.addEventListener('resize', fitViewport);
+  fitViewport();
+  const menu = $('#menu');
+  const menuButton = $('#open-menu');
+  menuButton.addEventListener('click', () => menu.showModal());
+  $('#close-menu').addEventListener('click', () => menu.close());
+  menu.addEventListener('click', event => {
+    if (event.target === menu && event.clientX > menu.getBoundingClientRect().right) menu.close();
+  });
+  let current = 'chat', previous = 'chat', toastTimer;
+  function show(id) {
+    if (menu.open) menu.close();
+    if (id === current) return;
+    previous = current;
+    current = id;
+    $('.view').forEach(view => view.classList.toggle('active', view.id === id));
+    $('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === id));
+    document.querySelector('main').scrollTop = 0;
+    const back = $('#' + id + ' [data-back] span');
+    if (back) back.textContent = 'Назад';
+    if (id === 'history') renderHistory();
+    if (id === 'notes') renderNotes();
+    if (id === 'day') renderTasks();
+    if (id === 'news') loadNews();
+    if (id === 'chat') tg?.BackButton?.hide();
+    else tg?.BackButton?.show();
+  }
   function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2300)}
   $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.tab,b.dataset.tab)));
   $$('[data-open]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.open,b.dataset.open==='chat'?'chat':'services')));
   $$('[data-back]').forEach(b=>b.addEventListener('click',()=>show(previous,previous==='home'?'home':'services')));
-  $('#chat-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#chat-input'),value=input.value.trim();if(!value)return;input.value='';sendMessage(value,false);});
-  $$('.suggestions button').forEach(b=>b.addEventListener('click',()=>{$('#chat-input').value=b.textContent;$('#chat-input').focus()}));
-  function renderChat(){const list=storage.read('messages');const box=$('#messages');box.innerHTML='';$('.suggestions').hidden=!!list.length;if(!list.length){box.innerHTML='<div class="chat-empty"><strong>С чего начнём?</strong><p>Спроси о чём угодно или расскажи, что у тебя на уме.</p></div>';return;}list.slice(-30).forEach(item=>{const div=document.createElement('div');div.className='message '+(item.role==='assistant'?'system':'user');div.textContent=item.text;box.append(div);});box.scrollTop=box.scrollHeight;}
-  async function sendMessage(text,fromVoice){const messages=storage.read('messages');messages.push({role:'user',text,at:Date.now()});storage.write('messages',messages.slice(-100));renderChat();const box=$('#messages');const status=document.createElement('div');status.className='message system';status.textContent=API_ENDPOINT?'Думаю…':'Backend LUMI ещё не настроен. Сообщение сохранено на этом устройстве.';box.append(status);if(!API_ENDPOINT){if(fromVoice)speak(status.textContent);return;}$('#chat-input').disabled=true;$('.send').disabled=true;try{const response=await fetch(API_ENDPOINT.replace(/\/$/,'')+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:tg?.initData||'',messages:storage.read('messages').filter(m=>m.role==='user'||m.role==='assistant').slice(-16).map(m=>({role:m.role,text:m.text}))})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Не удалось получить ответ');const answer={role:'assistant',text:data.reply,at:Date.now()};const current=storage.read('messages');current.push(answer);storage.write('messages',current.slice(-100));status.remove();const row=document.createElement('div');row.className='message system';row.textContent=answer.text;box.append(row);if(fromVoice)speak(answer.text);voiceStatus.textContent='Ответ LUMI готов.';}catch(error){status.textContent=error.message||'Не удалось связаться с LUMI. Попробуй ещё раз.';if(fromVoice)speak(status.textContent);}finally{$('#chat-input').disabled=false;$('.send').disabled=false;}}
+  $('#chat-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#chat-input'),value=input.value.trim();if(!value)return;input.value='';resizeInput();sendMessage(value,false);});
+  const input = $('#chat-input');
+  function resizeInput() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  }
+  input.addEventListener('input', resizeInput);
+  $('.suggestions button').forEach(button => button.addEventListener('click', () => {
+    input.value = button.dataset.prompt;
+    input.focus();
+    resizeInput();
+  }));
+  function renderChat() {
+    const list = storage.read('messages');
+    $('#welcome').hidden = list.length > 0;
+    const box = $('#messages');
+    box.replaceChildren();
+    for (const item of list.slice(-30)) {
+      const row = document.createElement('div');
+      row.className = 'message ' + (item.role === 'assistant' ? 'system' : 'user');
+      row.textContent = item.text;
+      box.append(row);
+    }
+    const scroll = $('#chat-scroll');
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+  async function sendMessage(text,fromVoice){const messages=storage.read('messages');messages.push({role:'user',text,at:Date.now()});storage.write('messages',messages.slice(-100));renderChat();const box=$('#messages');const status=document.createElement('div');status.className='message system';status.textContent=API_ENDPOINT?'Думаю…':'Backend LUMI ещё не настроен. Сообщение сохранено на этом устройстве.';box.append(status);if(!API_ENDPOINT){if(fromVoice)speak(status.textContent);return;}$('#chat-input').disabled=true;$('.send').disabled=true;try{const response=await fetch(API_ENDPOINT.replace(/\/$/,'')+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:tg?.initData||'',messages:storage.read('messages').filter(m=>m.role==='user'||m.role==='assistant').slice(-16).map(m=>({role:m.role,text:m.text}))})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Не удалось получить ответ');const answer={role:'assistant',text:data.reply,at:Date.now()};const current=storage.read('messages');current.push(answer);storage.write('messages',current.slice(-100));status.remove();const row=document.createElement('div');row.className='message system';row.textContent=answer.text;box.append(row);$('#chat-scroll').scrollTop = $('#chat-scroll').scrollHeight;if(fromVoice)speak(answer.text);voiceStatus.textContent='Ответ LUMI готов.';}catch(error){status.textContent=error.message||'Не удалось связаться с LUMI. Попробуй ещё раз.';if(fromVoice)speak(status.textContent);}finally{$('#chat-input').disabled=false;$('.send').disabled=false;}}
   renderChat();
-  const voicePanel=document.createElement('details');voicePanel.className='voice-panel';voicePanel.innerHTML='<summary>Голосовой режим</summary><div class="voice-title">ГОЛОСОВОЙ ВВОД И ОТВЕТ</div><div class="voice-controls"><button class="voice-start" type="button"><span></span>Говорить</button><label for="voice-gender">Голос ответа</label><select id="voice-gender" aria-label="Голос ответа"><option value="female">Женский</option><option value="male">Мужской</option></select></div><div class="voice-status" aria-live="polite">Нажми «Говорить», скажи фразу и нажми ещё раз.</div><small class="voice-privacy">Запись до 25 секунд отправляется в Gemini для распознавания. LUMI не сохраняет аудиофайл.</small>';
+  const voicePanel=document.createElement('details');voicePanel.className='voice-panel';voicePanel.id='voice-panel';voicePanel.innerHTML='<summary>Голосовой режим</summary><div class="voice-title">ГОЛОСОВОЙ ВВОД И ОТВЕТ</div><div class="voice-controls"><button class="voice-start" type="button"><span></span>Говорить</button><label for="voice-gender">Голос ответа</label><select id="voice-gender" aria-label="Голос ответа"><option value="female">Женский</option><option value="male">Мужской</option></select></div><div class="voice-status" aria-live="polite">Нажми «Говорить», скажи фразу и нажми ещё раз.</div><small class="voice-privacy">Запись до 25 секунд отправляется в Gemini для распознавания. LUMI не сохраняет аудиофайл.</small>';
   $('.composer').before(voicePanel);
+  voicePanel.addEventListener('toggle', () => $('#composer-more').setAttribute('aria-expanded', String(voicePanel.open)));
   $('#composer-more').addEventListener('click',()=>{voicePanel.open=!voicePanel.open; if(voicePanel.open) voicePanel.scrollIntoView({block:'nearest',behavior:'smooth'});});
   const voiceStart=$('.voice-start'),voiceStatus=$('.voice-status');
   let activeRecorder=null,activeStream=null,recordedChunks=[],recordTimer=null,voiceRecordButton=null;
@@ -82,6 +137,8 @@
   $$('[data-map]').forEach(b=>b.addEventListener('click',()=>window.open('https://yandex.ru/maps/?text='+encodeURIComponent(b.dataset.map+' рядом'),'_blank','noopener')));
   $('#locate').addEventListener('click',()=>{if(!navigator.geolocation){toast('Геопозиция не поддерживается');return;}$('#weather-place').textContent='Определяю местоположение…';navigator.geolocation.getCurrentPosition(async p=>{try{const {latitude,longitude}=p.coords;const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`);if(!r.ok)throw Error();const d=await r.json(),c=d.current;$('#temperature').textContent=Math.round(c.temperature_2m)+'°';$('#weather-place').textContent='Рядом с тобой';$('#weather-detail').textContent=`Ощущается как ${Math.round(c.apparent_temperature)}° · сегодня ${Math.round(d.daily.temperature_2m_min[0])}° / ${Math.round(d.daily.temperature_2m_max[0])}°`;$('#weather-icon').textContent=c.weather_code===0?'☼':c.weather_code<60?'◒':'☂';}catch{$('#weather-place').textContent='Прогноз временно недоступен';toast('Не удалось загрузить погоду')}},()=>{$('#weather-place').textContent='Нет доступа к геопозиции';toast('Разреши доступ к геопозиции в браузере')},{timeout:10000});});
   let newsLoaded=false;async function loadNews(){if(newsLoaded)return;newsLoaded=true;const list=$('#news-list');try{const r=await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');if(!r.ok)throw Error();const ids=(await r.json()).slice(0,7);const items=await Promise.all(ids.map(async id=>{const x=await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);return x.ok?x.json():null}));const stories=items.filter(x=>x?.title&&x?.url);if(!stories.length)throw Error();list.innerHTML='';stories.forEach(s=>{const a=document.createElement('a');a.className='news-entry';a.href=s.url;a.target='_blank';a.rel='noopener';a.innerHTML='<div class="entry"><strong></strong><small></small></div>';a.querySelector('strong').textContent=s.title;a.querySelector('small').textContent=`Hacker News · ${s.score||0} points`;list.append(a);});}catch{list.innerHTML='<div class="empty">Новости сейчас недоступны. Источник работает без гарантии доступности, поэтому LUMI не подставляет выдуманные заголовки.<br><br><a href="https://news.ycombinator.com/" target="_blank" rel="noopener" style="color:#eee">Открыть Hacker News →</a></div>';}}
-  tg?.BackButton?.onClick(()=>{if(current!=='home'&&current!=='services'){show(previous,previous==='home'?'home':'services')}else if(current==='services')show('home','home')});
-  if(tg?.BackButton){const sync=()=>{if(current==='home')tg.BackButton.hide();else tg.BackButton.show()};document.addEventListener('click',()=>setTimeout(sync,20));}
+  tg?.BackButton?.onClick(() => {
+    if (menu.open) menu.close();
+    else show($('.view.active').classList.contains('subview') ? previous : 'chat');
+  });
 })();

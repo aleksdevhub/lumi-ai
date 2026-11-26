@@ -2,33 +2,65 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#212121"><meta name="description" content="LUMI — личный AI-ассистент в Telegram">
+  <meta name="theme-color" content="#101010"><meta name="description" content="LUMI — личный AI-ассистент в Telegram">
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=chat-refresh-1">
+  <link rel="stylesheet" href="style.css?v=folio-2">
 </head>
 <body><div class="app-shell">
-  <header class="topbar"><a class="wordmark" href="#home" aria-label="LUMI — главная">LUMI<span>®</span></a><button class="avatar" aria-label="Профиль">L</button></header>
+  <header class="topbar">
+    <button id="open-menu" class="icon-button" aria-label="Открыть меню" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+    <button class="wordmark" data-open="chat">Lumi</button>
+    <button class="icon-button" data-open="history" aria-label="История сообщений" data-icon="history"></button>
+  </header>
   <main>
     <section class="view" id="home">
-      <div class="hero"><div class="eyebrow">LUMI · ТВОЙ ПОМОЩНИК</div><h1>Чем могу помочь?</h1><p>Задай вопрос или выбери, с чего начать.</p>
-        <button class="ask-card" data-open="chat"><span class="ask-icon">＋</span><span><strong>Новый диалог</strong><small>Обсудить идею, решить задачу или просто спросить</small></span></button>
+      <div class="hero"><h1>Обзор</h1>
+        <button class="ask-card" data-open="chat"><span class="ask-icon">＋</span><span><strong>Открыть чат</strong><small>Перейти к переписке</small></span></button>
       </div>
       <div class="section-heading"><span>МОЙ ДЕНЬ</span><button data-open="day">Все планы</button></div>
       <button class="day-card" data-open="day"><span><span class="day-date" id="today"></span><strong id="day-count">Тихий день</strong><span class="day-preview" id="day-preview">Можно добавить что-нибудь важное</span></span><span class="day-mark">›</span></button>
       <div class="section-heading services-title"><span>ИНСТРУМЕНТЫ</span></div>
       <div class="service-grid"><button class="service" data-open="weather"><span class="service-icon">◒</span><strong>Погода</strong><small>На сегодня</small></button><button class="service" data-open="maps"><span class="service-icon">⌖</span><strong>Карты</strong><small>Найти место</small></button><button class="service" data-open="notes"><span class="service-icon">▤</span><strong>Память</strong><small>Заметки</small></button><button class="service" data-open="news"><span class="service-icon">◉</span><strong>Новости</strong><small>Главное</small></button></div>
-      <div class="home-foot">ТВОЙ ТЕМП. ТВОЁ ПРОСТРАНСТВО.</div>
+
     </section>
-    <section class="view active" id="chat"><div class="chat-header"><div><strong>Новый диалог</strong><small>LUMI · Личный AI-ассистент</small></div><button class="chat-history" data-open="history" aria-label="История диалогов">История</button></div><div class="messages" id="messages"></div><div class="suggestions"><button>Помоги распланировать день</button><button>Помоги написать текст</button><button>Объясни сложную тему</button></div><form class="composer" id="chat-form"><button type="button" class="composer-more" id="composer-more" aria-label="Голосовые настройки">＋</button><textarea id="chat-input" rows="1" placeholder="Спросить LUMI" aria-label="Сообщение"></textarea><button type="button" class="voice" id="voice" aria-label="Голосовой ввод">⌁</button><button class="send" aria-label="Отправить">↑</button></form><div class="chat-foot">LUMI может ошибаться. Проверяй важную информацию.</div></section>
-    <section class="view" id="services"><div class="view-head"><div class="eyebrow">LUMI · СЕРВИСЫ</div><h2>Всё нужное.</h2><p>Небольшие помощники на каждый день.</p></div><div class="service-list"><button data-open="weather"><span>◒</span><div><strong>Погода</strong><small>Прогноз рядом с тобой</small></div><b>→</b></button><button data-open="maps"><span>⌖</span><div><strong>Карты</strong><small>Ищи адреса и места</small></div><b>→</b></button><button data-open="notes"><span>▤</span><div><strong>Память</strong><small>Личные заметки</small></div><b>→</b></button><button data-open="day"><span>◷</span><div><strong>Мой день</strong><small>Планы и задачи</small></div><b>→</b></button><button data-open="history"><span>◌</span><div><strong>Диалоги</strong><small>Недавняя история</small></div><b>→</b></button><button data-open="news"><span>◉</span><div><strong>Новости</strong><small>Лента из открытых источников</small></div><b>→</b></button></div></section>
-    <section class="view" id="profile"><div class="view-head"><div class="eyebrow">LUMI · О ТЕБЕ</div><h2>Твоё пространство.</h2><p>Сделано бережно и просто.</p></div><div class="profile-card"><div class="profile-orb">L</div><strong id="profile-name">Привет</strong><small>Личные данные хранятся на устройстве</small></div><div class="settings-list"><div><span>Хранилище</span><small>Локально в этом браузере</small></div><div><span>Модель LUMI</span><small>Подключена через защищённый сервер</small></div><div><span>Версия</span><small>LUMI Mini App · 0.1</small></div><button id="clear-data">Очистить локальные данные</button></div></section>
-    <section class="view subview" id="weather"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><div class="eyebrow">СЕЙЧАС · ПОГОДА</div><h2>Небо рядом.</h2><p>Прогноз от Open-Meteo.</p></div><div class="weather-card"><div class="weather-main"><span id="weather-icon">◌</span><strong id="temperature">—°</strong></div><div id="weather-place">Определи местоположение</div><small id="weather-detail">Открой доступ к геопозиции</small><button id="locate">Показать погоду <b>→</b></button></div><p class="fineprint">Погода загружается из бесплатного Open-Meteo. Геопозиция используется только для запроса.</p></section>
-    <section class="view subview" id="maps"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><div class="eyebrow">КАРТЫ</div><h2>Куда дальше?</h2><p>Найди место в любимых картах.</p></div><form class="search-form" id="map-form"><input id="map-query" placeholder="Адрес или место" aria-label="Адрес или место"><button>Найти <b>→</b></button></form><div class="map-shortcuts"><button data-map="coffee">☕ Кофейня рядом <span>→</span></button><button data-map="restaurant">◒ Поесть рядом <span>→</span></button><button data-map="pharmacy">＋ Аптека рядом <span>→</span></button></div><p class="fineprint">Поиск откроется в Яндекс Картах. LUMI не получает историю поиска.</p></section>
-    <section class="view subview" id="notes"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><div class="eyebrow">ЛИЧНАЯ ПАМЯТЬ</div><h2>Оставь здесь.</h2><p>Заметки видны только тебе на этом устройстве.</p></div><form class="note-form" id="note-form"><textarea id="note-input" placeholder="Мысль, ссылка, что-то важное…" rows="3"></textarea><button class="primary">Сохранить заметку <b>→</b></button></form><div id="notes-list" class="entries"></div></section>
-    <section class="view subview" id="day"><button class="back" data-back>← <span>Главная</span></button><div class="view-head"><div class="eyebrow">ТВОЙ ДЕНЬ · <span id="day-long-date"></span></div><h2>В своём ритме.</h2><p>Добавляй планы, отмечай завершённое.</p></div><form class="task-form" id="task-form"><input id="task-input" placeholder="Что хотелось бы сделать?" aria-label="Новый план"><button aria-label="Добавить план">＋</button></form><div id="tasks-list" class="entries"></div></section>
-    <section class="view subview" id="history"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><div class="eyebrow">LUMI · ИСТОРИЯ</div><h2>Наши диалоги.</h2><p>Сохранённые сообщения на этом устройстве.</p></div><div id="history-list" class="entries"></div><button id="clear-history" class="text-button">Очистить историю</button></section>
-    <section class="view subview" id="news"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><div class="eyebrow">МИР · КОРОТКО</div><h2>Что происходит.</h2><p>Открытая новостная лента.</p></div><div id="news-list" class="entries"><div class="empty">Проверяю доступность источника…</div></div><div class="fineprint">Источник: Hacker News. Если лента не загрузится, покажу прямую ссылку на источник.</div></section>
+    <section class="view active" id="chat" aria-label="Чат">
+      <div id="chat-scroll">
+        <div id="welcome">
+          <div class="fold" aria-hidden="true"><i></i><i></i><i></i></div>
+          <h1>Что у тебя<br><em>на уме?</em></h1>
+          <div class="suggestions">
+            <button data-prompt="Помоги составить план на день. "><span data-icon="calendar"></span>Составить план</button>
+            <button data-prompt="Помоги отредактировать текст. "><span data-icon="note"></span>Улучшить текст</button>
+          </div>
+        </div>
+        <div class="messages" id="messages" aria-live="polite"></div>
+      </div>
+      <form class="composer" id="chat-form">
+        <textarea id="chat-input" rows="1" placeholder="Написать Lumi…" aria-label="Сообщение"></textarea>
+        <div class="composer-actions">
+          <button type="button" id="composer-more" aria-expanded="false" aria-controls="voice-panel"><span class="wave" aria-hidden="true"><i></i><i></i><i></i></span>Голос</button>
+          <button type="button" class="voice icon-button" id="voice" aria-label="Продиктовать текст"></button>
+          <button class="send icon-button" aria-label="Отправить сообщение"></button>
+        </div>
+      </form>
+    </section>
+    <section class="view" id="services"><div class="view-head"><h2>Инструменты</h2></div><div class="service-list"><button data-open="weather"><span>◒</span><div><strong>Погода</strong><small>Прогноз рядом с тобой</small></div><b>→</b></button><button data-open="maps"><span>⌖</span><div><strong>Карты</strong><small>Ищи адреса и места</small></div><b>→</b></button><button data-open="notes"><span>▤</span><div><strong>Память</strong><small>Личные заметки</small></div><b>→</b></button><button data-open="day"><span>◷</span><div><strong>Мой день</strong><small>Планы и задачи</small></div><b>→</b></button><button data-open="history"><span>◌</span><div><strong>Диалоги</strong><small>Недавняя история</small></div><b>→</b></button><button data-open="news"><span>◉</span><div><strong>Новости</strong><small>Лента из открытых источников</small></div><b>→</b></button></div></section>
+    <section class="view" id="profile"><div class="view-head"><h2>Профиль</h2></div><div class="profile-card"><div class="profile-orb">L</div><strong id="profile-name">Привет</strong><small>Личные данные хранятся на устройстве</small></div><div class="settings-list"><div><span>Хранилище</span><small>Локально в этом браузере</small></div><div><span>Модель LUMI</span><small>Подключена через защищённый сервер</small></div><div><span>Версия</span><small>LUMI Mini App · 0.1</small></div><button id="clear-data">Очистить локальные данные</button></div></section>
+    <section class="view subview" id="weather"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Погода</h2><p>Прогноз от Open-Meteo.</p></div><div class="weather-card"><div class="weather-main"><span id="weather-icon">◌</span><strong id="temperature">—°</strong></div><div id="weather-place">Определи местоположение</div><small id="weather-detail">Открой доступ к геопозиции</small><button id="locate">Показать погоду <b>→</b></button></div><p class="fineprint">Погода загружается из бесплатного Open-Meteo. Геопозиция используется только для запроса.</p></section>
+    <section class="view subview" id="maps"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Карты</h2><p>Найди место в любимых картах.</p></div><form class="search-form" id="map-form"><input id="map-query" placeholder="Адрес или место" aria-label="Адрес или место"><button>Найти <b>→</b></button></form><div class="map-shortcuts"><button data-map="coffee">☕ Кофейня рядом <span>→</span></button><button data-map="restaurant">◒ Поесть рядом <span>→</span></button><button data-map="pharmacy">＋ Аптека рядом <span>→</span></button></div><p class="fineprint">Поиск откроется в Яндекс Картах. LUMI не получает историю поиска.</p></section>
+    <section class="view subview" id="notes"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Заметки</h2><p>Заметки видны только тебе на этом устройстве.</p></div><form class="note-form" id="note-form"><textarea id="note-input" placeholder="Мысль, ссылка, что-то важное…" rows="3"></textarea><button class="primary">Сохранить заметку <b>→</b></button></form><div id="notes-list" class="entries"></div></section>
+    <section class="view subview" id="day"><button class="back" data-back>← <span>Главная</span></button><div class="view-head"><div class="eyebrow">ТВОЙ ДЕНЬ · <span id="day-long-date"></span></div><h2>Планы</h2><p>Добавляй планы, отмечай завершённое.</p></div><form class="task-form" id="task-form"><input id="task-input" placeholder="Что хотелось бы сделать?" aria-label="Новый план"><button aria-label="Добавить план">＋</button></form><div id="tasks-list" class="entries"></div></section>
+    <section class="view subview" id="history"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>История сообщений</h2><p>Сохранённые сообщения на этом устройстве.</p></div><div id="history-list" class="entries"></div><button id="clear-history" class="text-button">Очистить историю</button></section>
+    <section class="view subview" id="news"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Новости</h2><p>Открытая новостная лента.</p></div><div id="news-list" class="entries"><div class="empty">Проверяю доступность источника…</div></div><div class="fineprint">Источник: Hacker News. Если лента не загрузится, покажу прямую ссылку на источник.</div></section>
   </main>
-  <nav class="tabbar" aria-label="Основная навигация"><button class="tab active" data-tab="chat"><span>◌</span>Чат</button><button class="tab" data-tab="home"><span>⌂</span>Главная</button><button class="tab" data-tab="services"><span>✳</span>Инструменты</button><button class="tab" data-tab="profile"><span>○</span>Профиль</button></nav>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=voice-v1"></script></body></html>
+  <dialog id="menu" aria-label="Навигация">
+    <div class="menu-head"><strong>Lumi</strong><button id="close-menu" class="icon-button" aria-label="Закрыть меню">×</button></div>
+    <nav aria-label="Разделы">
+      <button class="tab active" data-tab="chat"><span data-icon="chat"></span>Чат</button>
+      <button class="tab" data-tab="home"><span data-icon="home"></span>Обзор</button>
+      <button class="tab" data-tab="services"><span data-icon="grid"></span>Инструменты</button>
+      <button class="tab" data-tab="profile"><span data-icon="user"></span>Профиль</button>
+    </nav>
+  </dialog>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=folio-2"></script></body></html>
