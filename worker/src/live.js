@@ -42,15 +42,40 @@ async function webSearch(query) {
   return results.map(({title,url,snippet})=>({title,url,snippet}));
 }
 
+const newsCache = new Map();
 async function news(query) {
-  const url=new URL(query ? 'https://news.google.com/rss/search' : 'https://news.google.com/rss');
-  url.search=new URLSearchParams({hl:'ru',gl:'RU',ceid:'RU:ru',...(query && {q:query+' when:7d'})});
-  const now=Date.now();
-  return rss(await read(url,'rss')).filter(item=>{
-    const stamp=Date.parse(item.date);
-    return stamp<=now+3600000 && stamp>=now-7*86400000;
-  }).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).slice(0,4)
-    .map(({title,url,date})=>({title,url,date}));
+  const key=query.toLowerCase().trim();
+  const cached=newsCache.get(key);
+  if(cached && Date.now()-cached.at<300000) return cached.rows;
+  const google=new URL(key?'https://news.google.com/rss/search':'https://news.google.com/rss');
+  google.search=new URLSearchParams({hl:'ru',gl:'RU',ceid:'RU:ru',...(key && {q:key+' when:7d'})});
+  async function feed(url) {
+    try {
+      return rss(await read(url,'rss')).filter(item=>{
+        const age=Date.now()-Date.parse(item.date);
+        return age>=-3600000 && age<7*86400000;
+      });
+    } catch {return [];}
+  }
+  let rows=key ? await feed(google) : [];
+  if(!rows.length) {
+    const feeds=await Promise.all(['https://www.interfax.ru/rss.asp','https://feeds.bbci.co.uk/russian/rss.xml','https://lenta.ru/rss/news'].map(feed));
+    const tokens=key.split(/[^\p{L}\p{N}]+/u).filter(w=>w.length>=2).map(w=>w.slice(0,5));
+    rows=feeds.flat().filter(item=>!key || tokens.length && tokens.every(t=>(item.title+' '+item.snippet).toLowerCase().includes(t)));
+    if(!rows.length && !key) rows=await feed(google);
+  }
+  const picked=[], seen=new Set();
+  for(const item of rows.sort((a,b)=>Date.parse(b.date)-Date.parse(a.date))) {
+    if(seen.has(item.title)) continue;
+    seen.add(item.title);
+    picked.push({title:item.title,url:item.url,date:item.date});
+    if(picked.length===4) break;
+  }
+  if(picked.length) {
+    if(newsCache.size>=64) newsCache.delete(newsCache.keys().next().value);
+    newsCache.set(key,{rows:picked,at:Date.now()});
+  }
+  return picked;
 }
 
 async function weather(city) {

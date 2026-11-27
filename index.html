@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#101010"><meta name="description" content="LUMI — личный AI-ассистент в Telegram">
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=live-1">
+  <link rel="stylesheet" href="style.css?v=amethyst-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar">
@@ -32,6 +32,7 @@
           <div class="suggestions">
             <button data-prompt="Помоги составить план на день. "><span data-icon="calendar"></span>Составить план</button>
             <button data-prompt="Помоги отредактировать текст. "><span data-icon="note"></span>Улучшить текст</button>
+            <button data-prompt="Покажи свежие новости"><span data-icon="news"></span>Свежие новости</button>
           </div>
         </div>
         <div class="messages" id="messages" aria-live="polite"></div>
@@ -69,7 +70,7 @@
     <section class="view subview" id="notes"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Заметки</h2><p>Заметки видны только тебе на этом устройстве.</p></div><form class="note-form" id="note-form"><textarea id="note-input" placeholder="Мысль, ссылка, что-то важное…" rows="3"></textarea><button class="primary">Сохранить заметку <b>→</b></button></form><div id="notes-list" class="entries"></div></section>
     <section class="view subview" id="day"><button class="back" data-back>← <span>Главная</span></button><div class="view-head"><div class="eyebrow">ТВОЙ ДЕНЬ · <span id="day-long-date"></span></div><h2>Планы</h2><p>Добавляй планы, отмечай завершённое.</p></div><form class="task-form" id="task-form"><input id="task-input" placeholder="Что хотелось бы сделать?" aria-label="Новый план"><button aria-label="Добавить план">＋</button></form><div id="tasks-list" class="entries"></div></section>
     <section class="view subview" id="history"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Недавние чаты</h2><button class="new-chat" data-new-chat>＋ Новый чат</button></div><div id="history-list" class="entries"></div><button id="clear-history" class="text-button">Очистить чаты на устройстве</button></section>
-    <section class="view subview" id="news"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Новости</h2><p>Открытая новостная лента.</p></div><div id="news-list" class="entries"><div class="empty">Проверяю доступность источника…</div></div><div class="fineprint">Источник: Hacker News. Если лента не загрузится, покажу прямую ссылку на источник.</div></section>
+    <section class="view subview" id="news"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Новости</h2><p>Открытая новостная лента.</p></div><div id="news-list" class="entries"><div class="empty">Проверяю доступность источника…</div></div><div class="fineprint">Заголовки из открытых новостных лент.</div></section>
   </main>
   <dialog id="menu" aria-label="Навигация">
     <div class="menu-head"><strong>Lumi</strong><button id="close-menu" class="icon-button" aria-label="Закрыть меню">×</button></div>
@@ -82,4 +83,4 @@
     </nav>
     <h3 class="recent-heading">Недавние чаты</h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=reader-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=news-2"></script></body></html>

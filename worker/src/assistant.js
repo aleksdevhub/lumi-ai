@@ -48,7 +48,9 @@ export async function answer(env,contents,preferences,memory=[]) {
   const direct=question.match(/^\/(поиск|погода|новости)(?:\s+([\s\S]*))?$/i);
   let name,query;
   const explicitRead=question.match(/^\s*\/(?:прочитай|read)\s+(https:\/\/[^\s]+)(?:\s|$)/iu);
-  if(explicitRead) { name='read_page'; query=explicitRead[1]; }
+  const headlineRequest=question.trim().match(/^(?:(?:дай|покажи|расскажи|выдай|пришли|какие)(?:\s+мне)?\s+)?(?:(?:свежие|последние|сегодняшние|главные)\s+)?новости(?:\s+(?:на сегодня|за сегодня|сегодня|дня))?(?:\s+(?:про|о|об|по теме)\s+(.+?))?[?!.]*$/iu);
+  if(headlineRequest) { name='news'; query=headlineRequest[1]||''; }
+  else if(explicitRead) { name='read_page'; query=explicitRead[1]; }
   else if(direct) {
     name=({'поиск':'search','погода':'weather','новости':'news'})[direct[1].toLowerCase()];
     query=direct[2]?.trim()||'';
@@ -77,11 +79,16 @@ export async function answer(env,contents,preferences,memory=[]) {
     if(!page) return {reply:'Не удалось прочитать страницу. Проверь публичную ссылку или пришли текст.'};
     rows=[page];
   } else {
+    if(name==='news') query=typeof query==='string'?query:'';
     rows=await lookup(name,query);
     if(name==='search' && rows.length) {
       page=await readPage(rows[0].url);
       if(page) rows[0]=page;
     }
+  }
+  if(name==='news') {
+    if(!rows.length) return {reply:query?'За последние семь дней по этой теме подходящих заголовков не нашлось. Попробуй более короткую тему.':'Новостные ленты сейчас не ответили свежими заголовками. Попробуй чуть позже.'};
+    if(headlineRequest || direct) return {reply:fallback(name,rows),sources:rows.map(({title,url})=>({title,url})),checkedAt:date};
   }
   if(!rows.length) return {reply:name==='weather'?'Не удалось получить прогноз. Уточни город или попробуй позже.':'Свежих результатов получить не удалось. Попробуй изменить запрос или повторить позже.'};
   let reply=fallback(name,rows.map(r=>({...r,snippet:r.snippet?.slice(0,350)})));

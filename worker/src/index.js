@@ -1,3 +1,4 @@
+import {lookup} from './live.js';
 import {answer} from './assistant.js';
 import {PcRelay, matches} from './pc.js';
 export {PcRelay};
@@ -44,6 +45,10 @@ export default {
     const allowed = origin === env.ALLOWED_ORIGIN ? origin : "";
     if (request.method === "OPTIONS") return allowed ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Lumi-Pair", "Access-Control-Max-Age": "86400", "Vary": "Origin" } }) : new Response(null, { status: 403 });
     const url = new URL(request.url);
+    if (request.method === 'GET' && url.pathname === '/news') {
+      const items=await lookup('news','');
+      return response({items},items.length?200:503,allowed);
+    }
     if (request.method === "GET" && url.pathname === "/health") return response({ ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"] }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))

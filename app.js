@@ -542,7 +542,27 @@
   $('#map-form').addEventListener('submit',e=>{e.preventDefault();const q=$('#map-query').value.trim();if(q)window.open('https://yandex.ru/maps/?text='+encodeURIComponent(q),'_blank','noopener');});
   $$('[data-map]').forEach(b=>b.addEventListener('click',()=>window.open('https://yandex.ru/maps/?text='+encodeURIComponent(b.dataset.map+' рядом'),'_blank','noopener')));
   $('#locate').addEventListener('click',()=>{if(!navigator.geolocation){toast('Геопозиция не поддерживается');return;}$('#weather-place').textContent='Определяю местоположение…';navigator.geolocation.getCurrentPosition(async p=>{try{const {latitude,longitude}=p.coords;const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`);if(!r.ok)throw Error();const d=await r.json(),c=d.current;$('#temperature').textContent=Math.round(c.temperature_2m)+'°';$('#weather-place').textContent='Рядом с тобой';$('#weather-detail').textContent=`Ощущается как ${Math.round(c.apparent_temperature)}° · сегодня ${Math.round(d.daily.temperature_2m_min[0])}° / ${Math.round(d.daily.temperature_2m_max[0])}°`;$('#weather-icon').textContent=c.weather_code===0?'☼':c.weather_code<60?'◒':'☂';}catch{$('#weather-place').textContent='Прогноз временно недоступен';toast('Не удалось загрузить погоду')}},()=>{$('#weather-place').textContent='Нет доступа к геопозиции';toast('Разреши доступ к геопозиции в браузере')},{timeout:10000});});
-  let newsLoaded=false;async function loadNews(){if(newsLoaded)return;newsLoaded=true;const list=$('#news-list');try{const r=await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');if(!r.ok)throw Error();const ids=(await r.json()).slice(0,7);const items=await Promise.all(ids.map(async id=>{const x=await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);return x.ok?x.json():null}));const stories=items.filter(x=>x?.title&&x?.url);if(!stories.length)throw Error();list.innerHTML='';stories.forEach(s=>{const a=document.createElement('a');a.className='news-entry';a.href=s.url;a.target='_blank';a.rel='noopener';a.innerHTML='<div class="entry"><strong></strong><small></small></div>';a.querySelector('strong').textContent=s.title;a.querySelector('small').textContent=`Hacker News · ${s.score||0} points`;list.append(a);});}catch{list.innerHTML='<div class="empty">Новости сейчас недоступны. Источник работает без гарантии доступности, поэтому LUMI не подставляет выдуманные заголовки.<br><br><a href="https://news.ycombinator.com/" target="_blank" rel="noopener" style="color:#eee">Открыть Hacker News →</a></div>';}}
+  let lastNewsLoad=0, loadingNews=false;
+  async function loadNews() {
+    if(loadingNews || Date.now()-lastNewsLoad<300000) return;
+    loadingNews=true;
+    const list=$('#news-list');
+    try {
+      const res=await fetch(API_ENDPOINT.replace(/\/$/,'')+'/news');
+      if(!res.ok) throw Error();
+      const {items}=await res.json();
+      const links=items.map(item=>{
+        const link=document.createElement('a');
+        link.className='news-entry';link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
+        const row=document.createElement('div');row.className='entry';
+        const title=document.createElement('strong');title.textContent=item.title;
+        const date=document.createElement('small');date.textContent=new URL(item.url).hostname+' · '+new Date(item.date).toLocaleString('ru-RU');
+        row.append(title,date);link.append(row);return link;
+      });
+      list.replaceChildren(...links);lastNewsLoad=Date.now();
+    } catch {list.textContent='Не удалось обновить ленту. Открой раздел чуть позже.';}
+    finally {loadingNews=false;}
+  }
   tg?.BackButton?.onClick(() => {
     if (menu.open) menu.close();
     else show($('.view.active').classList.contains('subview') ? previous : 'chat');

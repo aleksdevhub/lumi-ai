@@ -239,3 +239,24 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 #reply-prefs { width:100%; padding:10px; font:16px/1.5 inherit; font-size:16px; }
 .sources { margin-top:12px; padding-top:9px; border-top:1px solid #444; color:#aaa; font-size:13px; white-space:normal; }
 .sources a { display:block; padding:4px 0; color:#ddd; overflow-wrap:anywhere; }
+
+/* Lumi's violet palette keeps the conversation and controls in their familiar positions. */
+:root { --bg:#17141e; --surface:#282331; --line:#40364e; --text:#f7f2ff; }
+.topbar { background:var(--bg); border-bottom-color:#ffffff12; }
+.wordmark,.menu-head strong { font:650 24px/1 system-ui,sans-serif; letter-spacing:-.06em; }
+#chat-scroll:has(#welcome:not([hidden])) { background:radial-gradient(ellipse at 18% 44%,#a979ff12,transparent 58%); }
+.fold { transform:skew(-16deg); gap:4px; }
+.fold i { width:9px; border-radius:8px; background:#b198ff; }
+.fold i:nth-child(2) { background:#e2c6ff; }
+.fold i:nth-child(3) { background:#8e71ed; }
+#welcome h1 { font-weight:600; }
+#welcome h1 em { font:inherit; color:#d5b9ff; }
+.suggestions button { background:#282230; border-color:#45394f; border-radius:17px; }
+.suggestions svg,.sources a { color:#d3b6ff; }
+.composer { background:#2b2533; border-color:#51435e; }
+.composer:focus-within { border-color:#b097d3; }
+.composer-actions .send { background:#d2b4ff; color:#261637; }
+.message.user { background:#382c46; }
+.message.system::before { color:#d5bbf3; font-family:inherit; }
+#menu,.voice-panel[open] { background:#211c29; }
+.tab.active,.dialog-link[aria-current="true"] { background:#3a2f46; }
