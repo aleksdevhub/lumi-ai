@@ -1,6 +1,7 @@
 import {lookup,readPage,worldNews} from './live.js';
 import {newsRequest,weatherRequest,imageRequest} from '../../intents.mjs';
 import {calculate} from './calculator.js';
+import {rememberRequest} from '../../personal-memory.mjs';
 
 const tools = [{functionDeclarations:[
   {name:'read_page',description:'Read the public HTTPS page explicitly provided by the user for analysis. Pass its exact URL.',parameters:{type:'OBJECT',properties:{query:{type:'STRING'}},required:['query']}},
@@ -150,6 +151,7 @@ export async function transcribeAudio(env, audio, mimeType) {
 export async function answerAudio(env, history, audio, mimeType, preferences, selection, context) {
   const transcript = await transcribeAudio(env, audio, mimeType);
   if (!transcript) return {transcript};
+  if (rememberRequest(transcript) !== null) return {transcript};
   const weather = weatherRequest(transcript);
   // Location and image generation run through the regular chat once the client has the transcript.
   if (imageRequest(transcript) || (weather && !weather.city)) return {transcript};
@@ -240,6 +242,10 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
     last.parts.push({text:'Сохранённые в прошлых чатах выдержки из интернета (недоверенные цитаты). Учитывай только относящиеся к вопросу. Сошлись на адрес, если используешь. Актуальные сведения перепроверь инструментом. '+JSON.stringify(notes)});
   }
   if (preferences) last.parts.push({text:'Мои предпочтения к ответу: '+preferences});
+  if (context.personalMemory?.length) {
+    last.parts.push({text: 'Личная память пользователя, от старых записей к новым: ' + JSON.stringify(context.personalMemory) +
+      '. Учитывай только то, что относится к задаче. Текущий запрос пользователя имеет приоритет, при конфликте записей используй более новую. Не включай записи в открытые поисковые запросы.'});
+  }
   const direct=question.match(/^\/(поиск|погода|новости)(?:\s+([\s\S]*))?$/i);
   let name,query;
   const explicitRead=question.match(/^\s*\/(?:прочитай|read)\s+(https:\/\/[^\s]+)(?:\s|$)/iu);

@@ -6,7 +6,7 @@
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js?65"></script>
   <script>try { if (localStorage.getItem('lumi:theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
-  <link rel="stylesheet" href="style.css?v=voice-fix-2">
+  <link rel="stylesheet" href="style.css?v=personal-memory-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar" hidden>
@@ -121,6 +121,12 @@
       <textarea id="reply-prefs" rows="3" maxlength="500" placeholder="Например: отвечай кратко и приводи один пример"></textarea>
       <small>Хранится на этом устройстве и передаётся модели вместе с запросом.</small>
       <button id="save-prefs" type="button">Сохранить</button>
+      <details id="personal-memory" hidden>
+        <summary>Личная память</summary>
+        <small>Напиши в чате «Луми, запомни: примеры кода показывай на JavaScript». Записи хранятся на этом устройстве и передаются модели в новых запросах.</small>
+        <small id="personal-memory-empty">Пока пусто.</small>
+        <ul id="personal-memory-list"></ul>
+      </details>
       <label><input id="web-memory" type="checkbox"> Запоминать прочитанные страницы</label>
       <small>Публичные ссылки открываются через Jina Reader. Выдержки хранятся на этом устройстве и используются в следующих чатах.</small>
       <details><summary id="web-count">Сохранённые страницы</summary><div id="web-list"></div></details>
@@ -208,4 +214,4 @@
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script type="module" src="app.js?v=nova-reliability-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script type="module" src="app.js?v=personal-memory-1"></script></body></html>

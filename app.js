@@ -1,4 +1,5 @@
 import {weatherRequest, imageRequest} from './intents.mjs?v=nova-reliability-1';
+import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, personalMemoryLimit, rememberRequest} from './personal-memory.mjs?v=1';
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
@@ -451,6 +452,53 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=nova-reliability-1';
   const prefs = $('#reply-prefs');
   prefs.value=storage.read('replyPrefs','');
   $('#save-prefs').onclick=()=>{storage.write('replyPrefs',prefs.value.trim());toast('Предпочтения сохранены');};
+  const personalKey = tg?.initData ? personalMemoryKey(telegramId) : null;
+  const personalList = $('#personal-memory-list');
+  const personalNotes = () => personalKey ? normalizePersonalMemory(storage.read(personalKey)) : [];
+
+  function renderPersonalMemory() {
+    const notes = personalNotes();
+    personalList.replaceChildren();
+    $('#personal-memory-empty').hidden = notes.length > 0;
+    for (const note of notes) {
+      const row = document.createElement('li');
+      const text = document.createElement('span');
+      text.textContent = note;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Забыть';
+      remove.setAttribute('aria-label', 'Забыть запись: ' + note);
+      remove.onclick = () => {
+        try {
+          storage.write(personalKey, personalNotes().filter(item => item !== note));
+          renderPersonalMemory();
+          toast('Запись удалена из памяти');
+        } catch { toast('Не удалось удалить запись'); }
+      };
+      row.append(text, remove);
+      personalList.append(row);
+    }
+  }
+
+  function savePersonalMemory(note) {
+    if (!personalKey) return 'Для памяти открой LUMI из Telegram.';
+    if (!note) return 'Напиши, например: «Луми, запомни: примеры кода показывай на JavaScript».';
+    if (note.length > personalMemoryEntryLimit) return 'Запись должна быть не длиннее 200 символов.';
+    const notes = personalNotes();
+    if (notes.some(item => item.toLocaleLowerCase('ru') === note.toLocaleLowerCase('ru'))) return 'Это уже есть в памяти.';
+    if (notes.length >= personalMemoryLimit) return 'Память заполнена. Удали одну запись в настройках.';
+    try {
+      storage.write(personalKey, [...notes, note]);
+      renderPersonalMemory();
+      return 'Запомнила. Запись есть в настройках LUMI.';
+    } catch { return 'Не удалось сохранить запись на устройстве.'; }
+  }
+  $('#personal-memory').hidden = !personalKey;
+  renderPersonalMemory();
+  window.addEventListener('storage', event => {
+    if (personalKey && event.key === 'lumi:' + personalKey) renderPersonalMemory();
+  });
+
   function renderChat() {
     const list = dialogMessages(dialogId);
     $('#welcome').hidden = list.length > 0;
@@ -522,6 +570,13 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=nova-reliability-1';
   async function sendMessage(text, session, photo = null, prepared = null) {
     const target = dialogId;
     if (pending.has(target)) return;
+    const memoryNote = photo ? null : rememberRequest(text);
+    if (memoryNote !== null) {
+      const message = savePersonalMemory(memoryNote);
+      toast(message);
+      if (activeVoice(session)) voiceState('ready', message);
+      return;
+    }
     const messages = dialogMessages(target);
     messages.push({id: uid(), role: 'user', text, at: Date.now(), ...(photo && {thumb: photo.thumb})});
     try { saveDialog(target, messages); } catch { input.value=text; showPhoto(photo); toast('На устройстве недостаточно места для сообщения'); return; }
@@ -554,6 +609,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=nova-reliability-1';
           model: selectedModel,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           memory: relatedNotes(text),
+          personalMemory: personalNotes(),
           messages: nova ? modelHistory(messages, 24, 10000) : modelHistory(messages, 16),
         };
         const weather = !photo && weatherRequest(text);
@@ -839,6 +895,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=nova-reliability-1';
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           history: modelHistory(dialogMessages(dialogId), 8).map(message => ({...message, text: message.text.slice(0, 1200)})),
           preferences: storage.read('replyPrefs', ''),
+          personalMemory: personalNotes(),
         }),
       });
       const data = await result.json().catch(() => ({}));
@@ -1147,9 +1204,11 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=nova-reliability-1';
     if (confirm('Удалить все чаты на этом устройстве и отключить синхронизацию?')) clearDialogs();
   };
   $('#clear-data').onclick = () => {
-    if (!confirm('Удалить профиль, чаты, заметки и планы на этом устройстве?')) return;
+    if (!confirm('Удалить профиль, чаты, заметки, планы и память LUMI на этом устройстве?')) return;
     clearDialogs();
     localStorage.removeItem('lumi:'+memoryKey); localStorage.removeItem('lumi:'+enabledKey); memoryEnabled.checked=true; refreshNotes();
+    if (personalKey) localStorage.removeItem('lumi:' + personalKey);
+    renderPersonalMemory();
     prefs.value='';
     for (const key of ['tasks','notes','replyPrefs','profile']) localStorage.removeItem('lumi:'+key);
     renderTasks(); renderNotes(); renderProfile(); toast('Локальные данные удалены');
