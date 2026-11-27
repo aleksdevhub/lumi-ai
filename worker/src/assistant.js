@@ -28,6 +28,7 @@ export const novaThinking = 'xhigh';
 export const novaBackupModel = 'gemini-3.8-flash';
 export const maxToolRounds = 2;
 const weatherAnalysis = /(?:сравни|сопоставь|какая разница|разниц[ауые]|на сколько|насколько|где (?:теплее|холоднее)|посчитай|переведи|compare|difference|convert)/iu;
+const reviewTask = /(?:докажи|реши задачу|проверь (?:код|решение|расч[её]т)|перепроверь|отладь|найди ошибку в (?:коде|решении)|debug|prove|verify the (?:code|calculation|solution))/iu;
 let flashRetryAt = 0;
 let novaRetryAt = 0;
 
@@ -214,6 +215,7 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
   const last = {...contents.at(-1), parts: [...contents.at(-1).parts]};
   contents = [...contents.slice(0, -1), last];
   const question = last.parts[0].text;
+  const startedAt = Date.now();
   const mandatory = forceLive || /(?:найди в (?:интернете|сети)|посмотри в интернете|погугли|search the web)/iu.test(question);
   const jsonOnly = !context.voice && !mandatory && !weatherRequest(question) && !newsRequest(question) &&
     /^(?:пожалуйста[, ]+)?(?:(?:верни|выведи|дай|ответь)\s+(?:мне\s+)?(?:только\s+)?(?:в\s+формате\s+)?(?:валидный\s+)?json\b|(?:return|output|respond with)\s+(?:only\s+)?(?:valid\s+)?json\b)/iu.test(question);
@@ -263,7 +265,10 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
       if(mandatory) return {reply:'Не удалось подобрать источник для этого запроса. Попробуй уточнить тему.'};
       const reply=jsonOnly ? validatedJson(replyText(parts)) : replyText(parts);
       if(!reply) throw Error('Модель не вернула текст.');
-      return {reply};
+      if (!novaMode || context.voice || jsonOnly || last.parts.some(part => part.inlineData) ||
+          !reviewTask.test(question) || reply.length > 8000) return {reply};
+      const timeout = Math.min(9000, 38000 - (Date.now() - startedAt));
+      return {reply: timeout >= 2500 ? await reviewDraft(respond, contents, reply, timeout) : reply};
     }
     if (novaMode || calls.some(call => call.name === 'calculate') || weatherAnalysis.test(question) && calls.some(call => call.name === 'weather')) {
       return answerWithTools(respond, contents, parts, calls, question, context);
@@ -283,6 +288,36 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
     if(summary) result.reply=summary;
   } catch { /* Keep the retrieved data available if the follow-up fails. */ }
   return result;
+}
+
+async function reviewDraft(respond, contents, draft, timeout) {
+  const messages = [
+    ...contents,
+    {role: 'model', parts: [{text: draft}]},
+    {role: 'user', parts: [{text:
+      'Проверь черновик ответа на предыдущее сообщение. Сначала независимо сверь вывод с исходными условиями. ' +
+      'Ищи конкретную ошибку в расчётах, логике или коде и проверь явно заданные крайние случаи. ' +
+      'Не утверждай, что запускал код или проверял источники. Если существенной ошибки нет, верни corrected: null. ' +
+      'Если она есть, верни в corrected полный исправленный ответ в формате, который просил пользователь. Не добавляй отчёт о проверке.'}]},
+  ];
+  try {
+    const parts = await respond(messages, {
+      thinkingLevel: 'low', timeout,
+      generationConfig: {
+        maxOutputTokens: 4096,
+        responseMimeType: 'application/json',
+        responseJsonSchema: {
+          type: 'object',
+          properties: {corrected: {type: ['string', 'null']}},
+          required: ['corrected'],
+        },
+      },
+    });
+    const {corrected} = JSON.parse(validatedJson(replyText(parts)));
+    return typeof corrected === 'string' && corrected.trim() ? corrected.trim() : draft;
+  } catch {
+    return draft;
+  }
 }
 
 function validatedJson(text) {
