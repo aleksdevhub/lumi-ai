@@ -61,7 +61,7 @@ export default {
     const allowed = origin === env.ALLOWED_ORIGIN ? origin : "";
     if (request.method === "OPTIONS") return allowed ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Lumi-Pair", "Access-Control-Max-Age": "86400", "Vary": "Origin" } }) : new Response(null, { status: 403 });
     const url = new URL(request.url);
-    if (request.method === 'POST' && url.pathname === '/diagnostics/voice-release') {
+    if (request.method === 'POST' && url.pathname === '/diagnostics/voice-recovery') {
       if (Date.now() > 1795796774449 || !await matches(request.headers.get('Authorization')?.slice(7), '0c6e9e25803e8f9d26fa194bedb40dca2154c0d7d7303785a74ac3d4b4ba718f')) {
         return response({error:'Not found'},404);
       }
@@ -72,7 +72,7 @@ export default {
       try {
         const turn = await answerAudio(env, [], body.audioBase64, 'audio/wav', '', 'lumi-flash', {});
         return response({
-          recognized: /two|2/i.test(turn.transcript), answered: /four|4/i.test(turn.reply || ''),
+          recognized: /two|2/i.test(turn.transcript), answered: /four|4|четыре/i.test(turn.reply || ''), replyReceived: Boolean(turn.reply),
           ms: Date.now() - start,
         }, 200);
       } catch (error) {
@@ -95,7 +95,7 @@ export default {
       return response({items: items.map(({title,url,date}) => ({title,url,date}))}, items.length ? 200 : 503, allowed);
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
-      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, voiceRecovery: true, imageGeneration: !!env.AI,
+      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
