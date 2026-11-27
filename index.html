@@ -6,7 +6,7 @@
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js?65"></script>
   <script>try { if (localStorage.getItem('lumi:theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
-  <link rel="stylesheet" href="style.css?v=personal-memory-1">
+  <link rel="stylesheet" href="style.css?v=assistant-settings-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar" hidden>
@@ -99,6 +99,11 @@
           </div>
           <button class="panel-action" type="submit">Сохранить профиль</button>
         </form>
+        <div class="group-card">
+          <button type="button" class="group-row" data-open="personality">
+            <span class="row-icon" data-icon="spark"></span><span class="row-label">Личность LUMI</span><span class="row-chevron" aria-hidden="true">›</span>
+          </button>
+        </div>
       </div>
     </section>
     <section class="view" id="settings">
@@ -114,6 +119,9 @@
           </label>
           <button type="button" class="group-row" data-model aria-haspopup="dialog" aria-controls="model-picker">
             <span class="row-icon" data-icon="spark"></span><span class="row-label">Модель</span><span class="row-value" data-model-label>Lumi 1.2 Nova</span><span class="row-chevron" aria-hidden="true">›</span>
+          </button>
+          <button type="button" class="group-row" data-open="daily">
+            <span class="row-icon" data-icon="calendar"></span><span class="row-label">LUMI Daily</span><span class="row-value" id="daily-summary"></span><span class="row-chevron" aria-hidden="true">›</span>
           </button>
         </div>
         <details class="panel" id="reply-settings"><summary>Ответы и память</summary>
@@ -139,6 +147,53 @@
           <button id="clear-data" type="button">Очистить локальные данные</button>
         </details>
       </div>
+    </section>
+    <section class="view subview" id="personality">
+      <button class="back" data-back>← <span>Назад</span></button>
+      <div class="view-head"><h2>Личность LUMI</h2></div>
+      <form class="panel-stack" id="personality-form">
+        <div class="group-card preference-card">
+          <label class="preference-field">Стиль общения<select id="personality-style" name="style"></select></label>
+          <label class="preference-field">Язык ответов<select id="personality-language" name="language"></select></label>
+          <label class="preference-field">Любимый эмодзи<input name="emoji" maxlength="32" placeholder="Например, ✨"></label>
+        </div>
+        <div class="group-card preference-card">
+          <label class="preference-field">Черты характера<textarea name="traits" maxlength="220" rows="3" placeholder="Например, спокойная и внимательная к деталям"></textarea></label>
+        </div>
+        <p class="fineprint">Настройки применяются в чате и голосовых ответах. Они сохраняются на этом устройстве.</p>
+        <button class="primary" type="submit">Сохранить личность</button>
+      </form>
+    </section>
+    <section class="view subview" id="daily">
+      <button class="back" data-back>← <span>Назад</span></button>
+      <div class="view-head"><h2>LUMI Daily</h2><p>Ежедневная сводка в чате с ботом.</p></div>
+      <p class="fineprint" id="daily-status" role="status" hidden></p>
+      <button type="button" class="text-button" id="daily-reload" hidden>Загрузить ещё раз</button>
+      <form id="daily-form">
+        <fieldset class="panel-stack daily-fields" disabled>
+          <div class="group-card preference-card">
+            <label class="preference-field switch-field">Ежедневная сводка<input type="checkbox" name="enabled" role="switch"></label>
+          </div>
+          <div class="group-card preference-card daily-topics-card">
+            <label class="preference-field" for="daily-topic">Темы сводки</label>
+            <ul id="daily-topics"></ul>
+            <div class="topic-entry">
+              <input id="daily-topic" maxlength="60" placeholder="Например, космос" autocomplete="off">
+              <button id="daily-add-topic" type="button">Добавить</button>
+            </div>
+            <small class="fineprint">До трёх тем. LUMI ищет по ним свежие публикации.</small>
+          </div>
+          <div class="group-card preference-card">
+            <label class="preference-field">Время уведомления<input type="time" name="time" required></label>
+            <label class="preference-field">Часовой пояс<select name="offset" id="daily-offset"></select></label>
+          </div>
+          <div class="group-card preference-card">
+            <label class="preference-field">Стиль сводки<select name="style" id="daily-style"></select></label>
+            <label class="preference-field">Любимые эмодзи<input name="emoji" maxlength="32" placeholder="Например, ☀️"></label>
+          </div>
+          <button class="primary" type="submit">Сохранить настройки</button>
+        </fieldset>
+      </form>
     </section>
     <section class="view subview" id="weather"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Погода</h2><p>Прогноз от Open-Meteo.</p></div><div class="weather-card"><div class="weather-main"><span id="weather-icon">◌</span><strong id="temperature">—°</strong></div><div id="weather-place">Определи местоположение</div><small id="weather-detail">Открой доступ к геопозиции</small><button id="locate">Показать погоду <b>→</b></button></div><p class="fineprint">Погода загружается из бесплатного Open-Meteo. Геопозиция используется только для запроса.</p></section>
     <section class="view subview" id="maps"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Карты</h2><p>Найди место в любимых картах.</p></div><form class="search-form" id="map-form"><input id="map-query" placeholder="Адрес или место" aria-label="Адрес или место"><button>Найти <b>→</b></button></form><div class="map-shortcuts"><button data-map="coffee">☕ Кофейня рядом <span>→</span></button><button data-map="restaurant">◒ Поесть рядом <span>→</span></button><button data-map="pharmacy">＋ Аптека рядом <span>→</span></button></div><p class="fineprint">Поиск откроется в Яндекс Картах. LUMI не получает историю поиска.</p></section>
@@ -214,4 +269,4 @@
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script type="module" src="app.js?v=source-followup-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script type="module" src="app.js?v=assistant-settings-1"></script></body></html>

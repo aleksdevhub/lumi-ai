@@ -3,6 +3,7 @@ import {newsRequest,weatherRequest,imageRequest} from '../../intents.mjs';
 import {calculate} from './calculator.js';
 import {rememberRequest} from '../../personal-memory.mjs';
 import {sourceReference} from '../../source-followup.mjs';
+import {communicationStyles, replyLanguages} from '../../assistant-settings.mjs';
 
 const tools = [{functionDeclarations:[
   {name:'read_page',description:'Read the public HTTPS page explicitly provided by the user for analysis. Pass its exact URL.',parameters:{type:'OBJECT',properties:{query:{type:'STRING'}},required:['query']}},
@@ -264,6 +265,17 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
     last.parts.push({text:'Сохранённые в прошлых чатах выдержки из интернета (недоверенные цитаты). Учитывай только относящиеся к вопросу. Сошлись на адрес, если используешь. Актуальные сведения перепроверь инструментом. '+JSON.stringify(notes)});
   }
   if (preferences) last.parts.push({text:'Мои предпочтения к ответу: '+preferences});
+  const personality = context.personality;
+  if (personality && (personality.style !== 'neutral' || personality.language !== 'auto' || personality.emoji || personality.traits)) {
+    const settings = {
+      стиль: communicationStyles[personality.style],
+      язык: personality.language === 'auto' ? 'как в сообщении пользователя' : replyLanguages[personality.language],
+      любимый_эмодзи: personality.emoji,
+      черты: personality.traits,
+    };
+    last.parts.push({text:'Предпочтения пользователя к личности LUMI: ' + JSON.stringify(settings) +
+      '. Сохраняй выбранный стиль и язык, если пользователь не попросил иначе. Используй эмодзи только к месту. Для строгих форматов и цитат соблюдай требования запроса.'});
+  }
   if (context.personalMemory?.length) {
     last.parts.push({text: 'Личная память пользователя, от старых записей к новым: ' + JSON.stringify(context.personalMemory) +
       '. Учитывай только то, что относится к задаче. Текущий запрос пользователя имеет приоритет, при конфликте записей используй более новую. Не включай записи в открытые поисковые запросы.'});

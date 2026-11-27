@@ -1,18 +1,19 @@
 import {callTelegram, openLumiButton} from './telegram.js';
-import {worldNews} from './live.js';
+import {lookup, worldNews} from './live.js';
+import {communicationStyles, dailyTopicLimit, defaultDailyTopic, normalizeDailyTopics, normalizePersonality} from '../../assistant-settings.mjs';
 
 const minute = 60000;
 const day = 24 * 60 * minute;
 const maxReminders = 10;
 
 export function clockTime(value) {
-  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+  const match = typeof value === 'string' && value.match(/^(\d{1,2}):(\d{2})$/);
   if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) return null;
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
 export function offsetMinutes(value) {
-  const match = value.match(/^([+-])(\d{1,2})(?::(00|15|30|45))?$/);
+  const match = typeof value === 'string' && value.match(/^([+-])(\d{1,2})(?::(00|15|30|45))?$/);
   if (!match) return null;
   const result = (Number(match[2]) * 60 + Number(match[3] || 0)) * (match[1] === '-' ? -1 : 1);
   return result >= -12 * 60 && result <= 14 * 60 ? result : null;
@@ -29,6 +30,18 @@ function nextAt(now, minutes, offset) {
 
 const clockLabel = minutes => [Math.floor(minutes / 60), minutes % 60].map(value => String(value).padStart(2, '0')).join(':');
 const offsetLabel = offset => (offset < 0 ? '-' : '+') + clockLabel(Math.abs(offset));
+
+function dailySettings(state) {
+  const customization = normalizePersonality(state.dailyOptions);
+  return {
+    enabled: Boolean(state.daily),
+    time: clockLabel(state.daily?.time ?? state.dailyOptions?.time ?? 540),
+    offset: offsetLabel(state.offset),
+    topics: normalizeDailyTopics(state.dailyOptions?.topics ?? [defaultDailyTopic]),
+    style: customization.style,
+    emoji: customization.emoji,
+  };
+}
 
 function reminderTime(input, now, offset) {
   const relative = input.match(/^через\s+(\d{1,5})\s+(минут\p{L}*|час\p{L}*)\s+([\s\S]+)$/iu);
@@ -81,13 +94,28 @@ function html(value) {
 
 async function jobMessage(job, state) {
   if (job.text) return {text: '🔔 Напоминание от LUMI\n\n' + job.text};
-  const {items} = await worldNews(offsetLabel(state.offset));
-  const headlines = items.slice(0, 3).map((item, index) => {
-    const date = new Date(Date.parse(item.date) + state.offset * minute).toLocaleDateString('ru-RU', {timeZone:'UTC'});
-    return (index + 1) + '. <a href="' + html(item.url) + '">' + html(item.title) + '</a> · ' + date;
+  const {topics, style, emoji} = dailySettings(state);
+  const groups = await Promise.all(topics.map(async topic => ({
+    topic,
+    items: topic.toLocaleLowerCase('ru') === defaultDailyTopic.toLocaleLowerCase('ru')
+      ? (await worldNews(offsetLabel(state.offset))).items : await lookup('news', topic),
+  })));
+  const seen = new Set();
+  const sections = groups.map(({topic, items}) => {
+    const headlines = [];
+    for (const item of items) {
+      if (seen.has(item.url)) continue;
+      seen.add(item.url);
+      const date = new Date(Date.parse(item.date) + state.offset * minute).toLocaleDateString('ru-RU', {timeZone:'UTC'});
+      headlines.push('• <a href="' + html(item.url) + '">' + html(item.title) + '</a>' + (style === 'concise' ? '' : ' · ' + date));
+      if (headlines.length >= (topics.length === 1 ? 3 : 2)) break;
+    }
+    return '<b>' + html(topic) + '</b>\n' + (headlines.join('\n') || 'Свежих публикаций пока нет.');
   });
+  const title = style === 'professional' ? 'Ежедневный обзор LUMI' : style === 'friendly' ? 'Привет! Вот что нашла LUMI' : 'Сводка LUMI';
   return {
-    text:'☀️ Сводка LUMI\n\n' + (headlines.length ? headlines.join('\n\n') : 'Новостные ленты пока недоступны. Загляни в LUMI, чтобы посмотреть свои планы.'),
+    text:(emoji ? html(emoji) + ' ' : style === 'friendly' || style === 'neutral' ? '☀️ ' : '') + title + '\n\n' +
+      (sections.join('\n\n') || 'Свежих публикаций пока нет.'),
     parse_mode:'HTML',
   };
 }
@@ -110,6 +138,25 @@ export class LumiReminders {
     const {chatId, updateId, action, value} = await request.json();
     return this.ctx.blockConcurrencyWhile(async () => {
       const state = await this.ctx.storage.get('state') || {chatId, offset:180, daily:null, reminders:[], recent:[]};
+      if (action === 'settings') {
+        if (value === undefined) return Response.json(dailySettings(state));
+        const time = clockTime(value?.time);
+        const offset = offsetMinutes(value?.offset);
+        const topics = normalizeDailyTopics(value?.topics);
+        if (typeof value?.enabled !== 'boolean' || time === null || offset === null || !Array.isArray(value.topics) ||
+            value.topics.length > dailyTopicLimit || typeof value.style !== 'string' || !Object.hasOwn(communicationStyles, value.style)) {
+          return Response.json({error:'Проверь время, часовой пояс и параметры сводки.'},{status:422});
+        }
+        if (value.enabled && !topics.length) return Response.json({error:'Добавь хотя бы одну тему, чтобы включить сводку.'},{status:422});
+        const {style, emoji} = normalizePersonality(value);
+        const current = state.daily;
+        state.offset = offset;
+        state.dailyOptions = {time, topics, style, emoji};
+        state.daily = value.enabled ? {time, at: nextAt(Date.now(), time, offset)} : null;
+        if (current?.at === state.daily?.at && current?.time === state.daily?.time) state.daily = current ?? null;
+        await this.save(state);
+        return Response.json(dailySettings(state));
+      }
       if (action === 'menu') return Response.json(screen(state));
       const previous = state.recent.find(item => item.id === updateId);
       if (previous) return Response.json(previous.result);
@@ -119,6 +166,8 @@ export class LumiReminders {
         const time = clockTime(value);
         if (time === null) return Response.json({text:'Укажи время в формате ЧЧ:ММ. Например: /daily 08:30.'});
         state.daily = {time, at: nextAt(now, time, state.offset)};
+        const topics = dailySettings(state).topics;
+        state.dailyOptions = {...state.dailyOptions, time, topics:topics.length ? topics : [defaultDailyTopic]};
         notice = 'Сводка включена на ' + clockLabel(time) + ' (UTC' + offsetLabel(state.offset) + ').';
       } else if (action === 'off') {
         state.daily = null;

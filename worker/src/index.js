@@ -3,6 +3,7 @@ import {answer, answerAudio, maxToolRounds, novaBackupModel, novaModel, novaThin
 import {imageRequest} from '../../intents.mjs';
 import {normalizePersonalMemory} from '../../personal-memory.mjs';
 import {normalizeSources} from '../../source-followup.mjs';
+import {normalizePersonality} from '../../assistant-settings.mjs';
 import {PcRelay, matches} from './pc.js';
 import {handleTelegram} from './bot.js';
 export {PcRelay};
@@ -19,6 +20,7 @@ function localContext(body) {
     timeZone: typeof body.timeZone === 'string' && body.timeZone.length <= 64 ? body.timeZone : 'UTC',
     personalMemory: normalizePersonalMemory(body.personalMemory),
     previousSources: normalizeSources(body.previousSources),
+    personality: normalizePersonality(body.personality),
   };
 }
 
@@ -85,6 +87,7 @@ export default {
       ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather","calculate"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
       novaProvider: 'gemini', novaModel, novaThinking, novaBackupModel, novaLiteBackup: true, maxToolRounds, personalMemory: true, draftReview: true, datedHeadlines: true, sourceFollowup: true,
       telegramReminders: Boolean(env.REMINDERS),
+      assistantSettings: Boolean(env.REMINDERS),
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
@@ -99,6 +102,25 @@ export default {
       return response({databaseReady:result.ok},result.status);
     }
     if (!allowed) return response({ error: "Origin not allowed" }, 403);
+    if (request.method === 'POST' && url.pathname === '/daily/settings') {
+      if (!env.REMINDERS || !env.TELEGRAM_BOT_TOKEN) return response({error:'LUMI Daily временно недоступна.'},503,allowed);
+      if (Number(request.headers.get('Content-Length')) > 16000) return response({error:'Запрос слишком большой.'},413,allowed);
+      let body;
+      try {
+        const raw = await request.text();
+        if (encoder.encode(raw).byteLength > 16000) return response({error:'Запрос слишком большой.'},413,allowed);
+        body = JSON.parse(raw);
+      } catch { return response({error:'Не удалось прочитать настройки.'},400,allowed); }
+      const user = typeof body?.initData === 'string' ? await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN) : null;
+      if (!Number.isSafeInteger(user?.id) || user.id <= 0) return response({error:'Открой LUMI через Telegram.'},401,allowed);
+      try {
+        const schedule = env.REMINDERS.get(env.REMINDERS.idFromName(String(user.id)));
+        const result = await schedule.fetch('https://schedule/update',{
+          method:'POST',body:JSON.stringify({chatId:user.id,action:'settings',value:body.settings}),
+        });
+        return response(await result.json(), result.status, allowed);
+      } catch { return response({error:'Не удалось получить настройки LUMI Daily.'},502,allowed); }
+    }
     if (request.method === 'POST' && url.pathname === '/models') {
       if (Number(request.headers.get('Content-Length')) > 12000) return response({error: 'Запрос слишком большой.'}, 413, allowed);
       const raw = await request.text();

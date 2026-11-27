@@ -163,6 +163,34 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 #personal-memory-list li { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
 #personal-memory-list span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 #personal-memory-list button { flex: none; min-height: 44px; }
+.daily-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.preference-card { padding: 0 18px; }
+.preference-field {
+  display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: center;
+  min-height: 60px; gap: 12px; padding: 10px 0; color: var(--ink);
+}
+.preference-field + .preference-field { border-top: 1px solid var(--line); }
+.preference-field input:not([type="checkbox"]), .preference-field select, .preference-field textarea, .topic-entry input {
+  width: 100%; min-width: 0; min-height: 44px; border-radius: 12px; border: 1px solid var(--line);
+  padding: 8px 10px; background: var(--control); color: var(--ink); font: inherit; font-size: 16px;
+}
+.preference-field:has(textarea) { grid-template-columns: minmax(0,1fr); }
+.switch-field { grid-template-columns: minmax(0,1fr) auto; }
+.switch-field input {
+  appearance: none; display: grid; align-items: center; width: 46px; height: 28px; margin: 0;
+  padding: 3px; border: 1px solid var(--line); border-radius: 18px; background: var(--control);
+}
+.switch-field input::before { content: ''; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); }
+.switch-field input:checked { background: var(--action); }
+.switch-field input:checked::before { justify-self: end; background: var(--action-text); }
+.preference-field select { text-overflow: ellipsis; }
+.topic-entry { display: flex; gap: 8px; }
+.topic-entry button, #daily-topics button { min-height: 44px; flex: none; }
+#daily-topics { list-style: none; margin: 0; padding: 0; }
+#daily-topics li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#daily-topics span { min-width: 0; overflow-wrap: anywhere; }
+.daily-topics-card small { display: block; margin: 12px 0; }
+#daily-status { margin: 0 0 14px; }
 .sources { margin-top:12px; padding-top:9px; border-top:1px solid #444; color:#aaa; font-size:13px; white-space:normal; }
 .sources a { display:block; padding:4px 0; color:#ddd; overflow-wrap:anywhere; }
 .topbar [data-new-chat] { font-size: 25px; }

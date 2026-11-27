@@ -1,5 +1,6 @@
 import {weatherRequest, imageRequest} from './intents.mjs?v=nova-reliability-1';
 import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, personalMemoryLimit, rememberRequest} from './personal-memory.mjs?v=1';
+import {communicationStyles, dailyTopicLimit, normalizeDailyTopics, normalizePersonality, replyLanguages} from './assistant-settings.mjs?v=1';
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
@@ -106,6 +107,7 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
   $('#day-long-date').textContent = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long'}).format(date).toUpperCase();
   const profileForm = $('#profile-form');
   const telegramId = tg?.initDataUnsafe?.user?.id;
+  const personalityKey = 'personality:' + (personalMemoryKey(telegramId) ? String(telegramId) : 'guest');
   if (telegramId) {
     const idField = $('#profile-telegram-id');
     idField.value = String(telegramId);
@@ -225,6 +227,8 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
     if (id === 'notes') renderNotes();
     if (id === 'day') renderTasks();
     if (id === 'news') loadNews();
+    if (id === 'personality') renderPersonality();
+    if (id === 'daily') loadDailySettings();
     if (isTab) tg?.BackButton?.hide();
     else tg?.BackButton?.show();
   }
@@ -235,6 +239,150 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
     if (button.dataset.open === 'chat') renderChat();
   }));
   $$('[data-back]').forEach(button => button.addEventListener('click', goBack));
+
+  function fillOptions(select, options) {
+    select.replaceChildren(...Object.entries(options).map(([value, label]) => new Option(label, value)));
+  }
+
+  const personalityForm = $('#personality-form');
+  const readPersonality = () => normalizePersonality(storage.read(personalityKey));
+  fillOptions($('#personality-style'), communicationStyles);
+  fillOptions($('#personality-language'), replyLanguages);
+  function renderPersonality() {
+    const values = readPersonality();
+    for (const [name, value] of Object.entries(values)) personalityForm.elements.namedItem(name).value = value;
+  }
+  personalityForm.addEventListener('submit', event => {
+    event.preventDefault();
+    try {
+      const values = normalizePersonality(Object.fromEntries(new FormData(personalityForm)));
+      storage.write(personalityKey, values);
+      renderPersonality();
+      toast('Личность LUMI сохранена');
+    } catch { toast('Не удалось сохранить личность на устройстве.'); }
+  });
+
+  const dailyForm = $('#daily-form');
+  const dailyFields = dailyForm.querySelector('fieldset');
+  const dailyTopicInput = $('#daily-topic');
+  const dailyAdd = $('#daily-add-topic');
+  const dailyReload = $('#daily-reload');
+  const dailyStatus = $('#daily-status');
+  let dailyTopics = [];
+  let dailyBusy = false;
+  let dailyReady = false;
+  fillOptions($('#daily-style'), communicationStyles);
+  const zoneExamples = {0:'Лондон зимой', 120:'Калининград', 180:'Москва', 240:'Самара', 300:'Екатеринбург', 420:'Новосибирск', 480:'Иркутск', 540:'Якутск', 600:'Владивосток', 720:'Камчатка'};
+  const zones = {};
+  for (let minutes = -720; minutes <= 840; minutes += 15) {
+    const abs = Math.abs(minutes);
+    const value = (minutes < 0 ? '-' : '+') + [Math.floor(abs / 60), abs % 60].map(number => String(number).padStart(2, '0')).join(':');
+    zones[value] = 'UTC' + value + (zoneExamples[minutes] ? ' · ' + zoneExamples[minutes] : '');
+  }
+  fillOptions($('#daily-offset'), zones);
+
+  function setDailyStatus(message) {
+    dailyStatus.textContent = message;
+    dailyStatus.hidden = !message;
+  }
+
+  function renderDailyTopics() {
+    const list = $('#daily-topics');
+    list.replaceChildren();
+    dailyAdd.disabled = dailyTopics.length >= dailyTopicLimit;
+    dailyTopicInput.disabled = dailyAdd.disabled;
+    for (const topic of dailyTopics) {
+      const row = document.createElement('li');
+      const label = document.createElement('span');
+      label.textContent = topic;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = '×';
+      button.setAttribute('aria-label', 'Убрать тему: ' + topic);
+      button.onclick = () => {
+        dailyTopics = dailyTopics.filter(value => value !== topic);
+        renderDailyTopics();
+      };
+      row.append(label, button);
+      list.append(row);
+    }
+  }
+
+  function addDailyTopic() {
+    const topic = dailyTopicInput.value.trim();
+    if (!topic) return true;
+    const topics = normalizeDailyTopics([...dailyTopics, topic]);
+    if (topics.length === dailyTopics.length) {
+      setDailyStatus(dailyTopics.length === dailyTopicLimit ? 'Можно добавить до трёх тем.' : 'Эта тема уже есть.');
+      return false;
+    }
+    dailyTopics = topics;
+    dailyTopicInput.value = '';
+    renderDailyTopics();
+    setDailyStatus('');
+    return true;
+  }
+  dailyAdd.onclick = addDailyTopic;
+  dailyTopicInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); addDailyTopic(); }
+  });
+
+  function renderDaily(settings) {
+    for (const name of ['time', 'offset', 'style', 'emoji']) dailyForm.elements.namedItem(name).value = settings[name];
+    dailyForm.elements.namedItem('enabled').checked = settings.enabled;
+    dailyTopics = normalizeDailyTopics(settings.topics);
+    dailyTopicInput.value = '';
+    renderDailyTopics();
+    $('#daily-summary').textContent = settings.enabled ? settings.time : 'Выкл.';
+  }
+
+  async function syncDaily(settings) {
+    if (!API_ENDPOINT || !tg?.initData) {
+      setDailyStatus('Чтобы получать сводку, открой LUMI из Telegram.');
+      return;
+    }
+    if (dailyBusy) return;
+    dailyBusy = true;
+    dailyFields.disabled = true;
+    dailyReload.hidden = true;
+    setDailyStatus(settings ? 'Сохраняю…' : 'Загружаю настройки…');
+    try {
+      const reply = await fetch(API_ENDPOINT.replace(/\/$/, '') + '/daily/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({initData: tg.initData, settings}),
+      });
+      const status = await reply.json();
+      if (!reply.ok) throw new Error(status.error);
+      renderDaily(status);
+      dailyReady = true;
+      setDailyStatus(settings ? 'Настройки сохранены.' : '');
+    } catch (error) {
+      setDailyStatus(error.message || 'Не удалось загрузить настройки LUMI Daily.');
+      dailyReload.hidden = dailyReady;
+    } finally {
+      dailyBusy = false;
+      dailyFields.disabled = !dailyReady;
+    }
+  }
+
+  function loadDailySettings() {
+    if (!dailyBusy) { dailyReady = false; void syncDaily(); }
+  }
+  dailyReload.onclick = loadDailySettings;
+  dailyForm.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!dailyReady || !addDailyTopic()) return;
+    const fields = Object.fromEntries(new FormData(dailyForm));
+    const enabled = dailyForm.elements.namedItem('enabled').checked;
+    if (enabled && !dailyTopics.length) {
+      setDailyStatus('Добавь хотя бы одну тему, чтобы включить сводку.');
+      dailyTopicInput.focus();
+      return;
+    }
+    void syncDaily({...fields, enabled, topics:dailyTopics});
+  });
+
   const photoFile = $('#photo-file');
   const preview = $('#photo-preview');
   let draftPhoto = null;
@@ -614,6 +762,7 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
         const payload = {
           initData: tg?.initData || '',
           preferences: storage.read('replyPrefs', ''),
+          personality: readPersonality(),
           model: selectedModel,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           memory: relatedNotes(text),
@@ -905,6 +1054,7 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
           history: modelHistory(dialogMessages(dialogId), 8).map(message => ({...message, text: message.text.slice(0, 1200)})),
           previousSources: recentArticleSources(dialogMessages(dialogId)),
           preferences: storage.read('replyPrefs', ''),
+          personality: readPersonality(),
           personalMemory: personalNotes(),
         }),
       });
@@ -1218,6 +1368,7 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
     clearDialogs();
     localStorage.removeItem('lumi:'+memoryKey); localStorage.removeItem('lumi:'+enabledKey); memoryEnabled.checked=true; refreshNotes();
     if (personalKey) localStorage.removeItem('lumi:' + personalKey);
+    localStorage.removeItem('lumi:' + personalityKey);
     renderPersonalMemory();
     prefs.value='';
     for (const key of ['tasks','notes','replyPrefs','profile']) localStorage.removeItem('lumi:'+key);
