@@ -69,6 +69,37 @@ async function weather(city) {
     current:data.current,units:data.current_units,daily:data.daily,dailyUnits:data.daily_units}];
 }
 
+export async function readPage(address) {
+  let url;
+  try { url = new URL(address); } catch { return null; }
+  const host = url.hostname;
+  if (url.protocol !== 'https:' || url.username || url.password || url.port ||
+      address.length > 1800 || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host) ||
+      /\.(localhost|local|internal|test|invalid|lan|home|onion)$/i.test(host) ||
+      [...url.searchParams.keys()].some(k => /token|key|auth|sign|session|code|pass|secret/i.test(k))) return null;
+  url.hash = '';
+  try {
+    const res = await fetch('https://r.jina.ai/'+url.href,{
+      headers:{Accept:'text/plain'}, signal:AbortSignal.timeout(14000), redirect:'error'
+    });
+    if (!res.ok || !res.body) return null;
+    const reader=res.body.getReader(), decoder=new TextDecoder();
+    let raw='';
+    try {
+      while(raw.length<15000) {
+        const {value,done}=await reader.read();
+        if(done) break;
+        raw+=decoder.decode(value.subarray(0,60000),{stream:true});
+      }
+    } finally { await reader.cancel(); }
+    const start=raw.indexOf('Markdown Content:');
+    if(start<0 || /Warning: Target URL returned error|checking your browser|verify you are human/i.test(raw.slice(0,1500))) return null;
+    const snippet=raw.slice(start+17).trim().slice(0,10000);
+    if(snippet.length<40) return null;
+    return {title:(raw.match(/^Title:\s*(.+)$/m)?.[1]||host).slice(0,160),url:url.href,snippet};
+  } catch {return null;}
+}
+
 export async function lookup(kind,query) {
   if(typeof query!=='string') return [];
   query=query.trim().slice(0,200);

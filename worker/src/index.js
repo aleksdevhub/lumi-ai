@@ -182,7 +182,7 @@ export default {
     if (photoRequest) contents.at(-1).parts.push({ inlineData: { mimeType: "image/jpeg", data: body.photo } });
     try {
       const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0,500) : '';
-      return response(await answer(env,contents,preferences),200,allowed);
+      return response(await answer(env,contents,preferences,body.memory),200,allowed);
     } catch (error) {
       return response({error:error.status===429?'Достигнут лимит модели. Попробуй позже.':'Не удалось получить ответ от модели. Попробуй позже.'},error.status===429?429:502,allowed);
     }

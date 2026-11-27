@@ -210,6 +210,32 @@
     }
     row.append(block);
   }
+  const memoryKey='webNotes:'+(tg?.initDataUnsafe?.user?.id || 'guest');
+  const enabledKey=memoryKey+':enabled';
+  const memoryEnabled=$('#web-memory');
+  memoryEnabled.checked=storage.read(enabledKey,true);
+  function refreshNotes() {
+    const notes=storage.read(memoryKey);
+    $('#web-count').textContent='Сохранено страниц: '+notes.length;
+    const list=$('#web-list');
+    list.replaceChildren();
+    for(const n of notes) {
+      const row=document.createElement('p');
+      row.textContent=n.title+' · '+new Date(n.date).toLocaleDateString('ru-RU')+' — '+n.excerpt;
+      list.append(row);
+    }
+  }
+  function relatedNotes(text) {
+    if(!memoryEnabled.checked) return [];
+    const words=(text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]).map(w=>w.slice(0,6));
+    return storage.read(memoryKey).map(note=>{
+      const content=(note.title+' '+note.excerpt+' '+note.url).toLowerCase();
+      return {note,score:words.filter(w=>content.includes(w)).length};
+    }).filter(item=>item.score).sort((a,b)=>b.score-a.score).slice(0,3).map(item=>item.note);
+  }
+  memoryEnabled.onchange=()=>storage.write(enabledKey,memoryEnabled.checked);
+  $('#forget-web').onclick=()=>{storage.write(memoryKey,[]);refreshNotes();};
+  refreshNotes();
   const prefs = $('#reply-prefs');
   prefs.value=storage.read('replyPrefs','');
   $('#save-prefs').onclick=()=>{storage.write('replyPrefs',prefs.value.trim());toast('Предпочтения сохранены');};
@@ -296,6 +322,7 @@
       const payload = {
         initData: tg?.initData || '',
         preferences: storage.read('replyPrefs',''),
+        memory: relatedNotes(text),
         messages: history.map(m => ({role: m.role, text: (m.role==='assistant'?separateSources(m.text).body.slice(0,4000):m.text) || (m.thumb ? 'Фото' : '')}))
       };
       while(payload.messages.length>1 && new TextEncoder().encode(JSON.stringify(payload)).length>23500) payload.messages.shift();
@@ -312,6 +339,13 @@
       }
       const historyNow = dialogMessages(target);
       if (!historyNow.some(m => m.id === messages.at(-1).id)) return;
+      if(memoryEnabled.checked && data.note?.url && data.note.excerpt) {
+        try {
+          const notes=storage.read(memoryKey).filter(n=>n.url!==data.note.url);
+          storage.write(memoryKey,[data.note,...notes].slice(0,40));
+          refreshNotes();
+        } catch {toast('Не удалось сохранить страницу на устройстве');}
+      }
       let savedReply=data.reply;
       if(data.sources?.length && data.checkedAt) {
         savedReply+=sourceMarker+data.checkedAt+'\n'+data.sources.map(s=>s.title.replace(/\s+/g,' ')+'\n'+s.url).join('\n');
@@ -500,6 +534,7 @@
   $('#clear-data').onclick = () => {
     if (!confirm('Удалить чаты, заметки и планы на этом устройстве?')) return;
     clearDialogs();
+    localStorage.removeItem('lumi:'+memoryKey); localStorage.removeItem('lumi:'+enabledKey); memoryEnabled.checked=true; refreshNotes();
     prefs.value='';
     for (const key of ['tasks','notes','replyPrefs']) localStorage.removeItem('lumi:'+key);
     renderTasks(); renderNotes(); toast('Локальные данные удалены');
