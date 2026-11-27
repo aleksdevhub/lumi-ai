@@ -618,6 +618,13 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
     voicePlay.textContent = state === 'speaking' ? 'Остановить' : 'Воспроизвести';
   }
 
+  function setVoiceAudioMode(type) {
+    try {
+      const session = navigator.audioSession;
+      if (session && session.type !== type) session.type = type;
+    } catch {}
+  }
+
   function resetPlayback() {
     stopBufferedPlayback();
     audio.pause();
@@ -629,6 +636,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
     spokenText = '';
     speechHint = '';
     voicePlay.hidden = true;
+    setVoiceAudioMode('auto');
   }
 
   function activeVoice(session) {
@@ -638,6 +646,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
   function finishPlayback(resume = false) {
     const session = voiceSession;
     if (activeVoice(session) && voicePanel.dataset.state === 'speaking') {
+      setVoiceAudioMode('auto');
       voiceState('ready', speechHint || 'Ответ сохранён в чате.');
       if (resume && !session.manualTurns) setTimeout(() => {
         if (activeVoice(session) && voicePanel.dataset.state === 'ready') toggleRecording(session, true);
@@ -658,7 +667,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
 
   async function playReply() {
     const session = voiceSession;
-    if (!activeVoice(session) || !spokenText) return;
+    if (!activeVoice(session) || !spokenText || capture) return;
     if (voicePanel.dataset.state === 'speaking') {
       stopBufferedPlayback();
       audio.pause();
@@ -666,6 +675,8 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
       finishPlayback();
       return;
     }
+    // The recorder has released its microphone tracks before a reply can play.
+    setVoiceAudioMode('playback');
     try {
       if (deviceSpeech) {
         if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) throw Error();
@@ -678,6 +689,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
         utterance.onend = () => { if (activeVoice(session)) finishPlayback(true); };
         utterance.onerror = ({error}) => {
           if (activeVoice(session) && !['interrupted', 'canceled'].includes(error)) {
+            setVoiceAudioMode('auto');
             voiceState('ready', 'Не удалось воспроизвести голос. Ответ есть в чате.');
           }
         };
@@ -701,7 +713,10 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
         if (activeVoice(session) && !audio.paused) voiceState('speaking', 'Фонарик говорит…');
       }
     } catch {
-      if (activeVoice(session)) voiceState('ready', 'Нажми «Воспроизвести». Ответ есть в чате.');
+      if (activeVoice(session)) {
+        setVoiceAudioMode('auto');
+        voiceState('ready', 'Нажми «Воспроизвести». Ответ есть в чате.');
+      }
     }
   }
 
