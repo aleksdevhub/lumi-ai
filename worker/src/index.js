@@ -1,5 +1,5 @@
 import {worldNews} from './live.js';
-import {answer, answerAudio} from './assistant.js';
+import {answer, answerAudio, transcribeAudio} from './assistant.js';
 import {imageRequest} from '../../intents.mjs';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
@@ -68,23 +68,16 @@ export default {
       if (Number(request.headers.get('Content-Length')) > 230000) return response({error:'Too large'},413);
       const body = await request.json();
       if (typeof body.audioBase64 !== 'string' || body.audioBase64.length > 220000 || !body.audioBase64.startsWith('UklGR')) return response({error:'WAV required'},400);
-      const results = await Promise.all(['gemini-3.8-flash','gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash-lite'].map(async model => {
-        const start = Date.now();
-        try {
-          const result = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',{
-            method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},
-            signal:AbortSignal.timeout(10000),
-            body:JSON.stringify({
-              contents:[{role:'user',parts:[{text:'Transcribe this short public test phrase. Return only the transcript.'},{inlineData:{mimeType:'audio/wav',data:body.audioBase64}}]}],
-              generationConfig:{maxOutputTokens:160,thinkingConfig:{thinkingLevel:model==='gemini-3.8-flash'?'LOW':'MINIMAL'}},
-            }),
-          });
-          const data = await result.json();
-          const transcript = data.candidates?.[0]?.content?.parts?.find(part => !part.thought)?.text?.trim();
-          return {model,status:result.status,ms:Date.now()-start,recognized:/two|2/i.test(transcript || ''), code:data.error?.status};
-        } catch (error) { return {model,ms:Date.now()-start,code:error.name}; }
-      }));
-      return response({results},200);
+      const start = Date.now();
+      try {
+        const turn = await answerAudio(env, [], body.audioBase64, 'audio/wav', '', 'lumi-flash', {});
+        return response({
+          recognized: /two|2/i.test(turn.transcript), answered: /four|4/i.test(turn.reply || ''),
+          ms: Date.now() - start,
+        }, 200);
+      } catch (error) {
+        return response({code: error.upstreamStatus || error.name, ms: Date.now() - start}, 502);
+      }
     }
     if (request.method === 'POST' && url.pathname === '/telegram/start') {
       if (!env.TELEGRAM_BOT_TOKEN) return response({error: 'Bot unavailable'}, 503);
@@ -102,7 +95,7 @@ export default {
       return response({items: items.map(({title,url,date}) => ({title,url,date}))}, items.length ? 200 : 503, allowed);
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
-      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, imageGeneration: !!env.AI,
+      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, voiceRecovery: true, imageGeneration: !!env.AI,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
@@ -196,17 +189,17 @@ export default {
         body = JSON.parse(raw);
       } catch { return response({ error: "Не удалось прочитать запись." }, 400, allowed); }
       const user = typeof body?.initData === 'string' ? await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN) : null;
-      if (!user?.id) return response({ error: "Открой LUMI через Telegram и разреши доступ к микрофону." }, 401, allowed);
+      if (!user?.id) return response({error: 'Сессия Telegram устарела. Закрой LUMI и открой из бота заново.'}, 401, allowed);
       const now = Date.now();
       const key = String(user.id);
       const times = (recent.get(key) || []).filter(t => now - t < 60000);
       if (times.length >= 12) return response({ error: "Слишком много запросов. Подожди минуту." }, 429, allowed);
       times.push(now); recent.set(key, times);
-      const supportedTypes = new Set(["audio/webm", "audio/ogg", "audio/mp4", "audio/m4a", "audio/wav", "audio/aac", "audio/mpeg"]);
+      const supportedTypes = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/m4a', 'audio/wav', 'audio/aac', 'audio/mpeg']);
       const mimeType = String(body.mimeType || "").split(";")[0].toLowerCase();
       const audio = body.audioBase64;
       if (!supportedTypes.has(mimeType) || typeof audio !== "string" || audio.length < 16 || audio.length > 900000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(audio)) {
-        return response({ error: "Не получилось обработать запись. Попробуй записать ещё раз." }, 400, allowed);
+        return response({ error: "Получен неподдерживаемый или пустой аудиофайл. Запиши реплику ещё раз." }, 400, allowed);
       }
       const geminiMimeType = mimeType === "audio/mp4" ? "audio/m4a" : mimeType;
       if (body.conversation === true) {
@@ -220,34 +213,17 @@ export default {
           return response(turn, 200, allowed);
         } catch (error) {
           const limited = error.status === 429;
-          return response({error: limited ? 'Достигнут лимит модели. Попробуй позже.' : 'Не удалось обработать голосовой вопрос. Попробуй ещё раз.'}, limited ? 429 : 502, allowed);
+          console.error('Voice conversation failed', error.upstreamStatus || error.name);
+          return response({error: limited ? 'Сервис распознавания достиг лимита. Попробуй чуть позже.' : 'Сервис распознавания временно недоступен. Попробуй ещё раз.'}, limited ? 429 : 502, allowed);
         }
       }
-      const model = /^[a-zA-Z0-9._-]+$/.test(env.GEMINI_MODEL || "") ? env.GEMINI_MODEL : "gemini-3.5-flash-lite";
       try {
-        const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [
-              { text: "Точно расшифруй речь из этой короткой голосовой записи. Верни только распознанные слова без пояснений и кавычек. Сохрани язык оригинала." },
-              { inlineData: { mimeType: geminiMimeType, data: audio } }
-            ] }],
-            generationConfig: { maxOutputTokens: 300, temperature: 0 }
-          })
-        });
-        if (!upstream.ok) {
-          const err = await upstream.json().catch(() => ({}));
-          console.error("Gemini transcription error", upstream.status, err?.error?.status || "unknown");
-          return response({ error: upstream.status === 429 ? "Достигнут бесплатный лимит распознавания. Попробуй позже." : "Не удалось распознать запись. Попробуй ещё раз." }, upstream.status === 429 ? 429 : 502, allowed);
-        }
-        const data = await upstream.json();
-        const transcript = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("").trim();
-        if (!transcript) return response({ error: "Речь не распознана. Попробуй сказать ещё раз чуть ближе к микрофону." }, 422, allowed);
-        return response({ transcript }, 200, allowed);
+        const transcript = await transcribeAudio(env, audio, geminiMimeType);
+        if (!transcript) return response({error: 'Речь не распознана. Попробуй ещё раз.'}, 422, allowed);
+        return response({transcript}, 200, allowed);
       } catch (error) {
-        console.error("Gemini transcription connection error", error?.name || "unknown");
-        return response({ error: "Не удалось связаться с сервисом распознавания." }, 502, allowed);
+        const limited = error.status === 429;
+        return response({error: limited ? 'Достигнут лимит распознавания.' : 'Сервис распознавания временно недоступен.'}, limited ? 429 : 502, allowed);
       }
     }
     const photoRequest = url.pathname === "/chat/photo";

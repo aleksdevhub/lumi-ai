@@ -6,7 +6,7 @@
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js?65"></script>
   <script>try { if (localStorage.getItem('lumi:theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
-  <link rel="stylesheet" href="style.css?v=lumi-live-1">
+  <link rel="stylesheet" href="style.css?v=voice-fix-2">
 </head>
 <body><div class="app-shell">
   <header class="topbar" hidden>
@@ -169,6 +169,7 @@
       <p id="voice-status" role="status">Нажми «Говорить» и задай вопрос.</p>
       <div class="voice-buttons">
         <button type="button" id="voice-start" class="voice-action">Говорить</button>
+        <button type="button" id="voice-send" class="voice-action" hidden>Отправить запись</button>
         <button type="button" id="voice-play" class="voice-action" hidden>Воспроизвести</button>
       </div>
       <label class="voice-choice">Голос
@@ -191,7 +192,7 @@
         <input type="radio" name="model" value="lumi-1">
       </label>
       <label class="model-option">
-        <span><strong>Lumi 1.1 Flash</strong><small>Gemini 3.8 Flash · быстрый режим</small></span>
+        <span><strong>Lumi 1.1 Flash</strong><small>Gemini 3 Flash Preview · быстрый режим</small></span>
         <input type="radio" name="model" value="lumi-flash" checked>
       </label>
       <button class="model-done" value="done" autofocus>Готово</button>
@@ -202,4 +203,4 @@
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script type="module" src="app.js?v=lumi-live-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script type="module" src="app.js?v=voice-fix-2"></script></body></html>

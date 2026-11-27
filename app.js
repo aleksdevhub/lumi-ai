@@ -1,4 +1,4 @@
-import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
+import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
@@ -591,6 +591,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
   const voicePanel = $('#voice-panel');
   const voiceStatus = $('#voice-status');
   const voiceStart = $('#voice-start');
+  const voiceSend = $('#voice-send');
   const voicePlay = $('#voice-play');
   const voiceChoice = $('#voice-gender');
   const audio = $('#voice-audio');
@@ -613,6 +614,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
     voicePanel.dataset.state = state;
     voiceStatus.textContent = message;
     voiceStart.hidden = state === 'listening' || state === 'waiting';
+    if (state !== 'listening') voiceSend.hidden = true;
     voicePlay.textContent = state === 'speaking' ? 'Остановить' : 'Воспроизвести';
   }
 
@@ -637,8 +639,8 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
     const session = voiceSession;
     if (activeVoice(session) && voicePanel.dataset.state === 'speaking') {
       voiceState('ready', speechHint || 'Ответ сохранён в чате.');
-      if (resume) setTimeout(() => {
-        if (activeVoice(session) && voicePanel.dataset.state === 'ready') toggleRecording(session);
+      if (resume && !session.manualTurns) setTimeout(() => {
+        if (activeVoice(session) && voicePanel.dataset.state === 'ready') toggleRecording(session, true);
       }, 450);
     }
   }
@@ -760,13 +762,20 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
     stopSpeechDetection(turn);
     turn.stream.getTracks().forEach(track => track.stop());
     turn.stream = null;
-    const blob = new Blob(chunks, {type: turn.recorder.mimeType || 'audio/webm'});
+    const blob = new Blob(chunks, {type: chunks.find(chunk => chunk.type)?.type || turn.recorder.mimeType || turn.mimeType});
     const inform = message => activeVoice(turn.session) ? voiceState('ready', message) : toast(message);
     try {
-      if (blob.size < 1200) throw Error('Запись слишком короткая. Попробуй ещё раз.');
+      if (blob.size < 80) throw Error('Telegram вернул пустую запись. Нажми «Говорить» и повтори фразу.');
       if (blob.size > 670000) throw Error('Запись слишком большая. Скажи чуть короче.');
       if (activeVoice(turn.session)) voiceState('waiting', 'Фонарик слушает запись и готовит ответ…');
       const bytes = new Uint8Array(await blob.arrayBuffer());
+      const signature = new TextDecoder().decode(bytes.subarray(0, 12));
+      const mimeType = signature.startsWith('RIFF') && signature.endsWith('WAVE') ? 'audio/wav'
+        : signature.slice(4, 8) === 'ftyp' ? 'audio/mp4'
+        : signature.startsWith('OggS') ? 'audio/ogg'
+        : bytes[0] === 0x1a && bytes[1] === 0x45 ? 'audio/webm'
+        : blob.type.split(';')[0].toLowerCase().replace(/^video\//, 'audio/');
+      if (!mimeType) throw Error('Telegram не указал формат записи. Попробуй начать запись заново.');
       let binary = '';
       for (let offset = 0; offset < bytes.length; offset += 0x8000) {
         binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
@@ -777,7 +786,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
         signal: turn.controller.signal,
         body: JSON.stringify({
           initData: tg?.initData || '',
-          mimeType: blob.type.split(';')[0].toLowerCase(),
+          mimeType,
           audioBase64: btoa(binary),
           conversation: true,
           model: turn.model,
@@ -786,7 +795,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
           preferences: storage.read('replyPrefs', ''),
         }),
       });
-      const data = await result.json();
+      const data = await result.json().catch(() => ({}));
       if (!result.ok || typeof data.transcript !== 'string' || !data.transcript.trim()) {
         throw Error(data.error || 'Не удалось распознать речь.');
       }
@@ -807,6 +816,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
   function submitCapture(turn) {
     if (capture !== turn || turn.recorder.state !== 'recording') return;
     turn.committed = true;
+    if (!turn.heardSpeech) turn.session.manualTurns = true;
     stopSpeechDetection(turn);
     turn.recorder.stop();
   }
@@ -815,6 +825,8 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
     clearInterval(turn.silenceTimer);
     turn.inputNode?.disconnect();
     turn.inputNode = null;
+    turn.silentOutput?.disconnect();
+    turn.silentOutput = null;
   }
 
   function detectEndOfSpeech(turn) {
@@ -822,33 +834,44 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
     if (!context || context.state === 'closed') return false;
     try {
       const analyser = context.createAnalyser();
+      if (typeof analyser.getFloatTimeDomainData !== 'function') return false;
       analyser.fftSize = 1024;
       turn.inputNode = context.createMediaStreamSource(turn.stream);
       turn.inputNode.connect(analyser);
+      if (context.createGain) {
+        turn.silentOutput = context.createGain();
+        turn.silentOutput.gain.value = 0;
+        analyser.connect(turn.silentOutput);
+        turn.silentOutput.connect(context.destination);
+      }
       const samples = new Float32Array(analyser.fftSize);
       let noise = 0.004, activeFrames = 0, lastSpeech = 0;
       const started = performance.now();
       turn.silenceTimer = setInterval(() => {
         if (capture !== turn || turn.recorder.state !== 'recording') return;
         const now = performance.now();
-        if (context.state !== 'running') {
-          if (now - started > 12000) submitCapture(turn);
-          return;
+        if (context.state === 'running') {
+          analyser.getFloatTimeDomainData(samples);
+          const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
+          if (rms > Math.min(0.04, Math.max(0.006, noise * 2.1))) {
+            activeFrames++;
+            if (activeFrames >= 2 || lastSpeech) {
+              lastSpeech = now;
+              turn.heardSpeech = true;
+            }
+          } else {
+            activeFrames = 0;
+            if (!lastSpeech) noise = noise * 0.9 + Math.min(rms, 0.02) * 0.1;
+          }
         }
-        analyser.getFloatTimeDomainData(samples);
-        const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
-        if (rms > Math.min(0.065, Math.max(0.011, noise * 2.6))) {
-          activeFrames++;
-          if (activeFrames >= 2 || lastSpeech) lastSpeech = now;
-        } else {
-          activeFrames = 0;
-          if (!lastSpeech) noise = noise * 0.9 + Math.min(rms, 0.02) * 0.1;
-        }
-        if (lastSpeech && now - lastSpeech >= 850) submitCapture(turn);
-        if (!lastSpeech && now - started >= 9000) {
+        if (lastSpeech && now - lastSpeech >= 780) return submitCapture(turn);
+        if (!lastSpeech && now - started >= 1800) voiceSend.hidden = false;
+        if (!lastSpeech && now - started >= 7300 && !turn.automatic) {
+          submitCapture(turn);
+        } else if (!lastSpeech && now - started >= 9500 && turn.automatic) {
           releaseCapture(turn);
           if (turn.recorder.state === 'recording') turn.recorder.stop();
-          if (activeVoice(turn.session)) voiceState('ready', 'Не услышал речь. Нажми «Говорить» и попробуй снова.');
+          if (activeVoice(turn.session)) voiceState('ready', 'Нажми «Говорить», когда будешь готов продолжить.');
         }
       }, 65);
       return true;
@@ -858,14 +881,14 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
     }
   }
 
-  async function toggleRecording(session) {
-    if (capture || pending.has(dialogId)) return;
+  async function toggleRecording(session, automatic = false) {
+    if (!activeVoice(session) || capture || pending.has(dialogId)) return;
     const inform = message => activeVoice(session) && voiceState('ready', message);
     if (!API_ENDPOINT) return inform('Сервер LUMI недоступен.');
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       return inform('Запись с микрофона недоступна в этом браузере.');
     }
-    const turn = {controller: new AbortController(), session, model: selectedModel};
+    const turn = {controller: new AbortController(), session, model: selectedModel, automatic};
     capture = turn;
     resetPlayback();
     voiceState('waiting', 'Запрашиваю доступ к микрофону…');
@@ -875,13 +898,19 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
         if (Context && !session.audioContext) session.audioContext = new Context();
         if (session.audioContext?.state === 'suspended') session.audioContext.resume().catch(() => {});
       } catch {}
-      turn.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1}});
+      const ios = tg?.platform === 'ios' || /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      turn.stream = await navigator.mediaDevices.getUserMedia({audio: ios ? true : {echoCancellation: true, noiseSuppression: true, channelCount: 1}});
       if (capture !== turn) { turn.stream.getTracks().forEach(track => track.stop()); return; }
-      const formats = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
-      const mimeType = formats.find(type => MediaRecorder.isTypeSupported(type));
-      const recorder = turn.recorder = new MediaRecorder(turn.stream, {
-        ...(mimeType && {mimeType}), audioBitsPerSecond: 48000,
-      });
+      const formats = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'];
+      if (ios) formats.unshift('audio/mp4');
+      else formats.push('audio/mp4');
+      const mimeType = formats.find(type => MediaRecorder.isTypeSupported?.(type));
+      turn.mimeType = mimeType || '';
+      let recorder;
+      try {
+        recorder = new MediaRecorder(turn.stream, {...(mimeType && {mimeType}), audioBitsPerSecond: 48000});
+      } catch { recorder = new MediaRecorder(turn.stream); }
+      turn.recorder = recorder;
       const chunks = [];
       recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
       recorder.onstop = () => finishCapture(turn, chunks);
@@ -892,8 +921,9 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
       };
       recorder.start();
       const canDetect = detectEndOfSpeech(turn);
-      turn.timer = setTimeout(() => submitCapture(turn), canDetect ? 25000 : 12000);
-      voiceState('listening', canDetect ? 'Слушаю. После паузы отвечу автоматически.' : 'Слушаю. Запись отправится через 12 секунд.');
+      turn.timer = setTimeout(() => submitCapture(turn), canDetect ? 25000 : 7300);
+      voiceSend.hidden = canDetect;
+      voiceState('listening', 'Слушаю. После паузы отвечу автоматически.');
     } catch (error) {
       if (capture !== turn) return;
       releaseCapture(turn);
@@ -919,14 +949,15 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
       if (turn.recorder?.state === 'recording') turn.recorder.stop();
     }
     voiceSession?.abort();
+    resetPlayback();
     voiceSession?.audioContext?.close().catch(() => {});
     voiceSession = null;
-    resetPlayback();
     if (current === activeTab) tg?.BackButton?.hide();
   });
   $('#voice-close').addEventListener('click', () => voicePanel.close());
   $('#voice-read').addEventListener('click', () => voicePanel.close());
   voiceStart.addEventListener('click', () => toggleRecording(voiceSession));
+  voiceSend.addEventListener('click', () => { if (capture) submitCapture(capture); });
   function renderTasks(){const tasks=storage.read('tasks');const list=$('#tasks-list');list.innerHTML='';$('#day-count').textContent=tasks.length?`Выполнено: ${tasks.filter(t=>t.done).length} из ${tasks.length}`:'Нет дел';if(!tasks.length){list.innerHTML='<div class="empty">Планов пока нет. Добавь то, о чём хочется помнить.</div>';return;}tasks.forEach(t=>{const row=document.createElement('div');row.className='entry task-entry'+(t.done?' done':'');row.innerHTML=`<button class="check" aria-label="Отметить план">${t.done?'✓':''}</button><span></span><button class="remove" aria-label="Удалить">×</button>`;row.querySelector('span').textContent=t.text;row.querySelector('.check').onclick=()=>{t.done=!t.done;storage.write('tasks',tasks);renderTasks()};row.querySelector('.remove').onclick=()=>{storage.write('tasks',tasks.filter(x=>x.id!==t.id));renderTasks()};list.append(row);});}
   $('#task-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#task-input'),text=input.value.trim();if(!text)return;const tasks=storage.read('tasks');tasks.unshift({id:Date.now(),text,done:false});storage.write('tasks',tasks);input.value='';renderTasks()});renderTasks();
   function renderNotes(){const notes=storage.read('notes');const list=$('#notes-list');list.innerHTML='';if(!notes.length){list.innerHTML='<div class="empty">Здесь появятся сохранённые заметки.</div>';return;}notes.forEach(n=>{const row=document.createElement('div');row.className='entry';row.innerHTML='<span></span><button aria-label="Удалить заметку">×</button>';row.querySelector('span').textContent=n.text;const small=document.createElement('small');small.textContent=new Date(n.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});row.querySelector('span').append(small);row.querySelector('button').onclick=()=>{storage.write('notes',notes.filter(x=>x.id!==n.id));renderNotes()};list.append(row);});}
