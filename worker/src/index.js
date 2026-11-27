@@ -1,5 +1,5 @@
 import {worldNews} from './live.js';
-import {answer, answerAudio, novaBackupModel, novaModel, novaThinking, transcribeAudio} from './assistant.js';
+import {answer, answerAudio, maxToolRounds, novaBackupModel, novaModel, novaThinking, transcribeAudio} from './assistant.js';
 import {imageRequest} from '../../intents.mjs';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
@@ -78,7 +78,7 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
       ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather","calculate"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
-      novaProvider: 'gemini', novaModel, novaThinking, novaBackupModel, novaLiteBackup: true,
+      novaProvider: 'gemini', novaModel, novaThinking, novaBackupModel, novaLiteBackup: true, maxToolRounds,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))

@@ -4,6 +4,7 @@ export function calculate(expression) {
   const tokens = input.match(/\d+(?:\.\d+)?|[()+*/-]/g) || [];
   if (tokens.join('') !== input.replace(/\s+/g, '')) return null;
 
+  const bounded = value => Math.abs(value) <= Number.MAX_SAFE_INTEGER ? value : NaN;
   let index = 0;
   function factor() {
     const token = tokens[index++];
@@ -12,7 +13,7 @@ export function calculate(expression) {
       const value = sum();
       return tokens[index++] === ')' ? value : NaN;
     }
-    return token && /^\d/.test(token) ? Number(token) : NaN;
+    return token && /^\d/.test(token) ? bounded(Number(token)) : NaN;
   }
 
   function product() {
@@ -20,7 +21,7 @@ export function calculate(expression) {
     while (tokens[index] === '*' || tokens[index] === '/') {
       const operator = tokens[index++];
       const next = factor();
-      value = operator === '*' ? value * next : value / next;
+      value = bounded(operator === '*' ? value * next : value / next);
     }
     return value;
   }
@@ -30,7 +31,7 @@ export function calculate(expression) {
     while (tokens[index] === '+' || tokens[index] === '-') {
       const operator = tokens[index++];
       const next = product();
-      value = operator === '+' ? value + next : value - next;
+      value = bounded(operator === '+' ? value + next : value - next);
     }
     return value;
   }
