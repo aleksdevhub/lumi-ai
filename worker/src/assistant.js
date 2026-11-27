@@ -168,9 +168,11 @@ export async function answer(env, contents, preferences, memory = [], selection,
     try {
       return await answerWithModel(env, model, contents, preferences, memory, forceLive, context);
     } catch (error) {
-      if (![404, 429, 500, 502, 503, 504].includes(error.upstreamStatus)) throw error;
-      novaRetryAt = Date.now() + 30000;
-      console.warn('Nova temporarily unavailable', {status: error.upstreamStatus});
+      const timeout = error.name === 'TimeoutError' || error.name === 'AbortError';
+      const unavailable = [404, 429, 500, 502, 503, 504].includes(error.upstreamStatus);
+      if (!timeout && !unavailable) throw error;
+      if (unavailable) novaRetryAt = Date.now() + 30000;
+      console.warn('Nova temporarily unavailable', {reason: error.upstreamStatus || 'timeout'});
     }
   }
 
@@ -195,7 +197,7 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
   const respond = (messages, config) => {
     const options = {
       thinkingLevel: nova ? (context.voice ? 'high' : novaThinking) : model === novaBackupModel ? 'low' : (complex ? 'LOW' : 'MINIMAL'),
-      timeout: nova ? (context.voice ? 25000 : 75000) : (context.voice ? 10500 : complex ? 27000 : 18000),
+      timeout: nova ? (context.voice ? 14000 : 32000) : (context.voice ? 10500 : complex ? 27000 : 18000),
       ...(novaMode && {generationConfig: {maxOutputTokens: context.voice ? 4096 : 16384}}),
       ...(!novaMode && context.voice && {generationConfig: {maxOutputTokens: 550}}),
       ...config,
