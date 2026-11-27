@@ -5,18 +5,37 @@
   <meta name="theme-color" content="#101010"><meta name="description" content="LUMI — личный AI-ассистент в Telegram">
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=lumi-model-1">
+  <script>try { if (localStorage.getItem('lumi:theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
+  <link rel="stylesheet" href="style.css?v=home-tabs-1">
 </head>
 <body><div class="app-shell">
-  <header class="topbar">
+  <header class="topbar" hidden>
     <button id="open-menu" class="icon-button" aria-label="Открыть меню" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
-    <button type="button" class="model-trigger" id="open-model" aria-haspopup="dialog" aria-controls="model-picker" aria-label="Выбрать модель: Lumi 1.0">
+    <button type="button" class="model-trigger" id="open-model" data-model aria-haspopup="dialog" aria-controls="model-picker" aria-label="Выбрать модель: Lumi 1.0">
       Lumi <span>1.0</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
     </button>
     <button type="button" class="icon-button" data-new-chat aria-label="Новый чат" title="Новый чат">＋</button>
   </header>
   <main>
-    <section class="view active" id="chat" aria-label="Чат">
+    <section class="view active" id="home" aria-labelledby="home-title">
+      <div class="home-hero">
+        <div class="lumi-mascot home-mascot" role="img" aria-label="Маскот Lumi — робот Фонарик">
+              <span class="mascot-antenna" aria-hidden="true"></span>
+              <span class="mascot-face" aria-hidden="true"><i></i><i></i><b></b></span>
+            </div>
+        <h1 id="home-title">Привет, я Lumi</h1>
+        <p>Фонарик — мой маскот. Я помогу разобраться в вопросе, написать текст, разобрать фото или составить план.</p>
+        <button type="button" class="home-chat" data-open="chat"><span data-icon="chat"></span>Начать чат</button>
+      </div>
+      <h2 class="group-title">Что я умею</h2>
+      <div class="group-card">
+        <button type="button" class="group-row" data-open="day"><span class="row-icon" data-icon="calendar"></span><span class="row-label"><strong>Мой день</strong><small>Собери планы и отмечай дела</small></span><span class="row-chevron" aria-hidden="true">›</span></button>
+        <button type="button" class="group-row" data-open="news"><span class="row-icon" data-icon="news"></span><span class="row-label"><strong>Свежие новости</strong><small>Главное из открытых источников</small></span><span class="row-chevron" aria-hidden="true">›</span></button>
+        <button type="button" class="group-row" data-open="weather"><span class="row-icon" data-icon="sun"></span><span class="row-label"><strong>Погода</strong><small>Прогноз рядом с тобой</small></span><span class="row-chevron" aria-hidden="true">›</span></button>
+      </div>
+      <button type="button" class="all-tools" data-open="services"><span data-icon="grid"></span>Все инструменты<span class="row-chevron" aria-hidden="true">›</span></button>
+    </section>
+    <section class="view" id="chat" aria-label="Чат">
       <div id="chat-scroll">
         <div id="welcome">
           <div class="chat-greeting">
@@ -52,7 +71,8 @@
         </div>
       </form>
     </section>
-    <section class="view" id="services">
+    <section class="view subview" id="services">
+      <button class="back" data-back>← <span>Назад</span></button>
       <div class="view-head"><h2>Инструменты</h2></div>
       <div class="tool-grid">
         <button class="panel tool-card" data-open="weather"><span data-icon="sun"></span><strong>Погода</strong><small>Прогноз рядом</small></button>
@@ -75,6 +95,20 @@
           </div>
           <button class="panel-action" type="submit">Сохранить профиль</button>
         </form>
+      </div>
+    </section>
+    <section class="view" id="settings">
+      <div class="view-head"><h2>Настройки</h2></div>
+      <div class="panel-stack">
+        <div class="group-card settings-appearance">
+          <label class="group-row">
+            <span class="row-icon" data-icon="sun"></span><span class="row-label">Тема</span>
+            <select id="theme-select" aria-label="Тема оформления"><option value="dark">Тёмная</option><option value="light">Светлая</option></select>
+          </label>
+          <button type="button" class="group-row" data-model aria-haspopup="dialog" aria-controls="model-picker">
+            <span class="row-icon" data-icon="spark"></span><span class="row-label">Модель</span><span class="row-value">Lumi 1.0</span><span class="row-chevron" aria-hidden="true">›</span>
+          </button>
+        </div>
         <details class="panel" id="reply-settings"><summary>Ответы и память</summary>
       <label for="reply-prefs">Что учитывать в ответах?</label>
       <textarea id="reply-prefs" rows="3" maxlength="500" placeholder="Например: отвечай кратко и приводи один пример"></textarea>
@@ -96,7 +130,8 @@
     <section class="view subview" id="weather"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Погода</h2><p>Прогноз от Open-Meteo.</p></div><div class="weather-card"><div class="weather-main"><span id="weather-icon">◌</span><strong id="temperature">—°</strong></div><div id="weather-place">Определи местоположение</div><small id="weather-detail">Открой доступ к геопозиции</small><button id="locate">Показать погоду <b>→</b></button></div><p class="fineprint">Погода загружается из бесплатного Open-Meteo. Геопозиция используется только для запроса.</p></section>
     <section class="view subview" id="maps"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Карты</h2><p>Найди место в любимых картах.</p></div><form class="search-form" id="map-form"><input id="map-query" placeholder="Адрес или место" aria-label="Адрес или место"><button>Найти <b>→</b></button></form><div class="map-shortcuts"><button data-map="coffee">☕ Кофейня рядом <span>→</span></button><button data-map="restaurant">◒ Поесть рядом <span>→</span></button><button data-map="pharmacy">＋ Аптека рядом <span>→</span></button></div><p class="fineprint">Поиск откроется в Яндекс Картах. LUMI не получает историю поиска.</p></section>
     <section class="view subview" id="notes"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Заметки</h2><p>Заметки видны только тебе на этом устройстве.</p></div><form class="note-form" id="note-form"><textarea id="note-input" placeholder="Мысль, ссылка, что-то важное…" rows="3"></textarea><button class="primary">Сохранить заметку <b>→</b></button></form><div id="notes-list" class="entries"></div></section>
-    <section class="view" id="day">
+    <section class="view subview" id="day">
+      <button class="back" data-back>← <span>Назад</span></button>
       <div class="view-head"><div class="eyebrow" id="day-long-date"></div><h2>Мой день</h2></div>
       <div class="panel day-planner">
         <div class="day-progress"><h3>Планы</h3><span id="day-count"></span></div>
@@ -107,6 +142,14 @@
     <section class="view subview" id="history"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Недавние чаты</h2><button class="new-chat" data-new-chat>＋ Новый чат</button></div><div id="history-list" class="entries"></div><button id="clear-history" class="text-button">Очистить чаты на устройстве</button></section>
     <section class="view subview" id="news"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Новости</h2><p>Открытая новостная лента.</p></div><div id="news-list" class="entries"><div class="empty">Проверяю доступность источника…</div></div><div class="fineprint">Заголовки из открытых новостных лент.</div></section>
   </main>
+  <footer class="dock">
+    <nav class="bottom-nav" aria-label="Разделы LUMI">
+      <button type="button" class="tab active" data-tab="home" aria-current="page"><span data-icon="home"></span>Главная</button>
+      <button type="button" class="tab" data-tab="chat"><span data-icon="chat"></span>Чат</button>
+      <button type="button" class="tab" data-tab="settings"><span data-icon="settings"></span>Настройки</button>
+      <button type="button" class="tab" data-tab="profile"><span data-icon="user"></span>Профиль</button>
+    </nav>
+  </footer>
   <dialog id="model-picker" aria-labelledby="model-title">
     <form method="dialog" class="model-sheet">
       <h2 id="model-title">Модель для чата</h2>
@@ -117,15 +160,9 @@
       <button class="model-done" value="done" autofocus>Готово</button>
     </form>
   </dialog>
-  <dialog id="menu" aria-label="Навигация">
+  <dialog id="menu" aria-label="Недавние чаты">
     <div class="menu-head"><strong>Lumi</strong><button id="close-menu" class="icon-button" aria-label="Закрыть меню">×</button></div>
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
-    <nav aria-label="Разделы">
-      <button class="tab active" data-tab="chat"><span data-icon="chat"></span>Чат</button>
-      <button class="tab" data-tab="day"><span data-icon="calendar"></span>Мой день</button>
-      <button class="tab" data-tab="services"><span data-icon="grid"></span>Инструменты</button>
-      <button class="tab" data-tab="profile"><span data-icon="user"></span>Профиль</button>
-    </nav>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=lumi-model-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=home-tabs-1"></script></body></html>

@@ -304,3 +304,99 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
   #model-picker[open] { animation: mascot-arrives 180ms ease-out both; }
 }
 @keyframes mascot-arrives { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* A white glow frames the assistant while each section uses the same app dock. */
+:root {
+  --bg: #090909;
+  --dock: #181818;
+  --card: #1b1b1b;
+  --control: #2a2a2a;
+  --ink: #f4f4f2;
+  --quiet: #bdbdbd;
+  --action: #efefed;
+  --action-text: #161616;
+  --home-glow: radial-gradient(ellipse 85% 320px at 50% -95px, #fff 0%, #9a9a9a 38%, #383838 75%, transparent 100%);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f4f2;
+  --text: #202020;
+  --dock: #fff;
+  --card: #fff;
+  --surface: #fff;
+  --line: #d6d6d3;
+  --control: #eeeee9;
+  --ink: #1b1b1b;
+  --quiet: #595959;
+  --action: #242424;
+  --action-text: #fff;
+  --home-glow: radial-gradient(ellipse 80% 360px at 50% -70px, #fff 35%, #e0e0dd 77%, transparent 100%);
+}
+.app-shell { grid-template-rows: auto minmax(0, 1fr) auto; }
+.topbar { grid-row: 1; background: var(--bg); border-color: var(--line); }
+main { grid-row: 2; }
+.dock { grid-row: 3; padding: 7px var(--gutter) max(10px, env(safe-area-inset-bottom)); background: var(--bg); }
+.keyboard-open .dock { display: none; }
+.bottom-nav {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px;
+  width: min(100%, 520px); margin-inline: auto; padding: 4px;
+  border: 1px solid var(--line); border-radius: 23px; background: var(--dock);
+}
+.bottom-nav .tab {
+  flex-direction: column; justify-content: center; gap: 4px; min-width: 0;
+  min-height: 51px; padding: 4px 0; border-radius: 18px;
+  color: var(--quiet); font-size: clamp(10px, 3.1vw, 12px); text-align: center;
+}
+.bottom-nav .tab.active { color: var(--ink); background: var(--control); font-weight: 650; }
+.bottom-nav .tab:active { opacity: .75; }
+main:has(#home.active) { background: var(--home-glow); }
+#home { padding-bottom: 18px; }
+.home-hero { display: grid; justify-items: center; text-align: center; padding: 29px 5px 0; }
+.home-hero h1 { margin: 18px 0 0; font-size: clamp(30px, 7vw, 48px); line-height: 1.1; letter-spacing: -.055em; }
+.home-hero p { max-width: 390px; margin: 9px 0 15px; color: var(--quiet); font-size: 15px; line-height: 1.4; }
+.home-mascot { width: clamp(78px, 25vw, 110px); }
+.home-chat {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 7px 17px;
+  border: 0; border-radius: 14px; background: var(--action); color: var(--action-text);
+  font-size: 15px; font-weight: 650;
+}
+.group-title { margin: 22px 0 9px; font-size: 17px; font-weight: 650; }
+.group-card { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+.group-row, .all-tools {
+  display: flex; align-items: center; gap: 11px; width: 100%; min-height: 55px;
+  padding: 8px 12px; border: 0; background: transparent; color: var(--ink); text-align: left;
+  font-size: 15px;
+}
+.group-row + .group-row { border-top: 1px solid var(--line); }
+.group-row:focus-visible { outline-offset: -3px; }
+button.group-row:hover, button.all-tools:hover { background: var(--control); }
+.row-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--control); }
+.row-icon svg { width: 17px; height: 17px; }
+.row-label { flex: 1; min-width: 0; }
+.row-label strong { display: block; font-weight: 620; }
+.row-label small { display: block; margin-top: 3px; color: var(--quiet); font-size: 12px; }
+.row-chevron, .row-value { color: var(--quiet); flex: none; }
+.row-chevron { font-size: 21px; }
+.row-value { font-size: 13px; }
+.all-tools { margin-top: 7px; border-radius: 14px; }
+.all-tools .row-chevron { margin-left: auto; }
+#theme-select { flex: none; min-height: 38px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--control); color: var(--ink); font-size: 16px; }
+#chat.active { padding-bottom: 5px; }
+#settings .panel button {
+  min-height: 44px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--control); color: var(--ink); font-size: 14px;
+}
+#settings #clear-data { color: #ffb6b6; }
+
+[data-theme="light"] :is(.panel, .composer, #menu, #model-picker, .chat-greeting, .weather-card, #history-list .dialog-row) {
+  border-color: var(--line); background: var(--card); color: var(--ink);
+}
+[data-theme="light"] :is(.icon-button, .composer-actions button, #composer-more, .composer textarea, .entry > span, .back, .text-button, .panel > summary, .voice-panel[open], .voice-controls select, .map-shortcuts button, .sources a, .weather-main span) { color: var(--ink); }
+[data-theme="light"] :is(.model-trigger, .model-option, .suggestions button, .suggestions [data-icon], .profile-orb, .dialog-link[aria-current="true"], .message.user, .voice-panel[open], .voice-controls select, .tool-card [data-icon], .profile-fields input, #pc-code, #reply-prefs, .task-form input, .note-form textarea, .search-form input) {
+  border-color: var(--line); background: var(--control); color: var(--ink);
+}
+[data-theme="light"] :is(.model-trigger span, .model-trigger svg, .model-option small, .chat-greeting p, .tool-card small, .profile-heading small, .panel small, .panel p, .eyebrow, #day-count, .view-head > p, .message.system::before, .entry button, .task-entry.done > span, .weather-card small, .back span, .empty, .entry small, .voice-title, .voice-status, .voice-controls label, .voice-privacy, .fineprint, .recent-heading, #photo-preview small, .sources) { color: var(--quiet); }
+[data-theme="light"] :is(.composer-actions .send, .model-done, .task-form button, .search-form button, .primary, #profile .panel .panel-action, .voice-start, .toast) { background: var(--action); color: var(--action-text); }
+[data-theme="light"] :is(.tool-card, .dialog-remove, .suggestions button, .composer-actions button:not(.send)):hover { background: #e2e2df; }
+[data-theme="light"] :is(.entry, .map-shortcuts button, .sources, .new-chat, .voice-panel[open], .entry .check) { border-color: var(--line); }
+[data-theme="light"] #settings #clear-data { color: #972727; }

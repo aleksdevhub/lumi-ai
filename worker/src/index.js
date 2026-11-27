@@ -1,6 +1,7 @@
 import {lookup} from './live.js';
 import {answer} from './assistant.js';
 import {PcRelay, matches} from './pc.js';
+import {callTelegram, welcomeTelegram} from './bot.js';
 export {PcRelay};
 const encoder = new TextEncoder();
 const recent = new Map();
@@ -20,6 +21,10 @@ function hex(bytes) { return [...new Uint8Array(bytes)].map(x => x.toString(16).
 async function hmac(keyBytes, message) {
   const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(message)));
+}
+
+async function telegramWebhookSecret(token) {
+  return hex(await hmac(encoder.encode(token), "lumi-telegram-welcome-v1"));
 }
 
 async function verifyTelegram(initData, botToken) {
@@ -45,6 +50,45 @@ export default {
     const allowed = origin === env.ALLOWED_ORIGIN ? origin : "";
     if (request.method === "OPTIONS") return allowed ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Lumi-Pair", "Access-Control-Max-Age": "86400", "Vary": "Origin" } }) : new Response(null, { status: 403 });
     const url = new URL(request.url);
+    if (request.method === 'POST' && url.pathname === '/telegram/setup-once') {
+      if (Date.now() > 1795791124579 || !await matches(request.headers.get('Authorization')?.slice(7), '00f4e126f3e2e9e6f300b0ab1949afb2d6dc4bf752bfc644d8fc4fdb490daed9')) {
+        return response({error: 'Not found'}, 404);
+      }
+      const token = env.TELEGRAM_BOT_TOKEN;
+      if (!token) return response({error: 'Bot unavailable'}, 503);
+      try {
+        const me = await callTelegram(token, 'getMe');
+        if (me.result?.username?.toLowerCase() !== 'lumipersonalai_bot') return response({error: 'Unexpected bot'}, 409);
+        const hook = 'https://lumi-ai-api.aleksandrkruglov061.workers.dev/telegram/start';
+        const info = await callTelegram(token, 'getWebhookInfo');
+        if (!info.ok) return response({error: 'Webhook status unavailable'}, 502);
+        if (info.result.url && info.result.url !== hook) return response({error: 'An existing webhook is in use'}, 409);
+        const configured = await callTelegram(token, 'setWebhook', {
+          url: hook, secret_token: await telegramWebhookSecret(token), allowed_updates: ['message'],
+        });
+        if (!configured.ok) return response({error: 'Webhook registration failed'}, 502);
+        const menu = await callTelegram(token, 'setChatMenuButton', {menu_button: {type: 'commands'}});
+        const description = await callTelegram(token, 'setMyDescription', {
+          description: 'Я Lumi, твой ИИ-помощник. Помогаю с текстом, фотографиями, планами и поиском свежей информации. Нажми «Начать», чтобы познакомиться.',
+        });
+        const verified = await callTelegram(token, 'getWebhookInfo');
+        return response({
+          webhook: verified.ok && verified.result.url === hook,
+          menu: menu.ok === true,
+          description: description.ok === true,
+        }, 200);
+      } catch { return response({error: 'Telegram setup failed'}, 502); }
+    }
+    if (request.method === 'POST' && url.pathname === '/telegram/start') {
+      if (!env.TELEGRAM_BOT_TOKEN) return response({error: 'Bot unavailable'}, 503);
+      const provided = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
+      if (!/^[0-9a-f]{64}$/.test(provided)) return response({error: 'Unauthorized'}, 401);
+      const expected = await telegramWebhookSecret(env.TELEGRAM_BOT_TOKEN);
+      let mismatch = 0;
+      for (let i = 0; i < expected.length; i++) mismatch |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
+      if (mismatch) return response({error: 'Unauthorized'}, 401);
+      return welcomeTelegram(request, env.TELEGRAM_BOT_TOKEN);
+    }
     if (request.method === 'GET' && url.pathname === '/news') {
       const items=await lookup('news','');
       return response({items},items.length?200:503,allowed);
