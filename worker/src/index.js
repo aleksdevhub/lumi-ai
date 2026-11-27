@@ -61,24 +61,6 @@ export default {
     const allowed = origin === env.ALLOWED_ORIGIN ? origin : "";
     if (request.method === "OPTIONS") return allowed ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Lumi-Pair", "Access-Control-Max-Age": "86400", "Vary": "Origin" } }) : new Response(null, { status: 403 });
     const url = new URL(request.url);
-    if (request.method === 'POST' && url.pathname === '/diagnostics/voice-recovery') {
-      if (Date.now() > 1795796774449 || !await matches(request.headers.get('Authorization')?.slice(7), '0c6e9e25803e8f9d26fa194bedb40dca2154c0d7d7303785a74ac3d4b4ba718f')) {
-        return response({error:'Not found'},404);
-      }
-      if (Number(request.headers.get('Content-Length')) > 230000) return response({error:'Too large'},413);
-      const body = await request.json();
-      if (typeof body.audioBase64 !== 'string' || body.audioBase64.length > 220000 || !body.audioBase64.startsWith('UklGR')) return response({error:'WAV required'},400);
-      const start = Date.now();
-      try {
-        const turn = await answerAudio(env, [], body.audioBase64, 'audio/wav', '', 'lumi-flash', {});
-        return response({
-          recognized: /two|2/i.test(turn.transcript), answered: /four|4|четыре/i.test(turn.reply || ''), replyReceived: Boolean(turn.reply),
-          ms: Date.now() - start,
-        }, 200);
-      } catch (error) {
-        return response({code: error.upstreamStatus || error.name, ms: Date.now() - start}, 502);
-      }
-    }
     if (request.method === 'POST' && url.pathname === '/telegram/start') {
       if (!env.TELEGRAM_BOT_TOKEN) return response({error: 'Bot unavailable'}, 503);
       const provided = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
