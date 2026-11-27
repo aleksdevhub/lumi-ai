@@ -51,7 +51,7 @@ export default {
     if (request.method === "OPTIONS") return allowed ? new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Lumi-Pair", "Access-Control-Max-Age": "86400", "Vary": "Origin" } }) : new Response(null, { status: 403 });
     const url = new URL(request.url);
     if (request.method === 'POST' && url.pathname === '/telegram/setup-once') {
-      if (Date.now() > 1795791124579 || !await matches(request.headers.get('Authorization')?.slice(7), '00f4e126f3e2e9e6f300b0ab1949afb2d6dc4bf752bfc644d8fc4fdb490daed9')) {
+      if (Date.now() > 1795791293505 || !await matches(request.headers.get('Authorization')?.slice(7), '6ae9936af304b64d6cc25f71d0175d5b00e656bb18ea63e3bd0397dfe79a8290')) {
         return response({error: 'Not found'}, 404);
       }
       const token = env.TELEGRAM_BOT_TOKEN;
