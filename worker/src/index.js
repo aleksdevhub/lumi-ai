@@ -78,6 +78,54 @@ export default {
       return response({databaseReady:result.ok},result.status);
     }
     if (!allowed) return response({ error: "Origin not allowed" }, 403);
+    if (request.method === 'POST' && url.pathname === '/speak') {
+      if (!env.GEMINI_API_KEY || !env.TELEGRAM_BOT_TOKEN) return response({error: 'Озвучка недоступна.'}, 503, allowed);
+      if (Number(request.headers.get('Content-Length')) > 12000) return response({error: 'Запрос слишком большой.'}, 413, allowed);
+      let body;
+      try {
+        const raw = await request.text();
+        if (encoder.encode(raw).byteLength > 12000) return response({error: 'Запрос слишком большой.'}, 413, allowed);
+        body = JSON.parse(raw);
+      } catch { return response({error: 'Некорректный запрос.'}, 400, allowed); }
+      const user = typeof body?.initData === 'string' ? await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN) : null;
+      if (!user?.id) return response({error: 'Открой LUMI через Telegram.'}, 401, allowed);
+      const text = typeof body.text === 'string' ? body.text.trim() : '';
+      if (!text || text.length > 480 || !['female', 'male'].includes(body.voice)) {
+        return response({error: 'Некорректный текст для озвучки.'}, 400, allowed);
+      }
+      const now = Date.now();
+      const key = 'tts:' + user.id;
+      const usage = (recent.get(key) || []).filter(at => now - at < 60000);
+      if (usage.length >= 4) return response({error: 'Озвучка временно ограничена.'}, 429, allowed);
+      recent.set(key, [...usage, now]);
+      try {
+        const upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY},
+          signal: AbortSignal.timeout(20000),
+          body: JSON.stringify({
+            model: 'gemini-3.8-flash-lite-tts',
+            store: false,
+            input: [{type: 'user_input', content: [{
+              type: 'text', text,
+              annotations: [{type: 'speech_metadata', style: 'warm, conversational and relaxed'}],
+            }]}],
+            response_format: {type: 'audio'},
+            generation_config: {speech_config: [{voice: body.voice === 'male' ? 'Puck' : 'Aoede'}]},
+          }),
+        });
+        if (!upstream.ok) return response({error: 'Нейроголос временно недоступен.'}, upstream.status === 429 ? 429 : 502, allowed);
+        const data = await upstream.json();
+        const audio = data.steps?.flatMap(step => step.content || []).findLast(part => part.type === 'audio');
+        if (typeof audio?.data !== 'string' || !audio.data.startsWith('UklGR') || audio.data.length > 4500000) {
+          return response({error: 'Не удалось получить озвучку.'}, 502, allowed);
+        }
+        const bytes = Uint8Array.from(atob(audio.data), char => char.charCodeAt(0));
+        return new Response(bytes, {headers: {'Content-Type': 'audio/wav', 'Access-Control-Allow-Origin': allowed, 'Cache-Control': 'no-store', Vary: 'Origin'}});
+      } catch {
+        return response({error: 'Не удалось подготовить озвучку.'}, 502, allowed);
+      }
+    }
     if (request.method === 'POST' && url.pathname === '/dialogs/sync') {
       if (!await matches(request.headers.get('X-Lumi-Pair'),env.PAIR_HASH)) return response({error:'Проверь код подключения.'},403,allowed);
       if (Number(request.headers.get('Content-Length')) > 180000) return response({error:'Пакет слишком большой'},413,allowed);

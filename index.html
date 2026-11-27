@@ -6,7 +6,7 @@
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>try { if (localStorage.getItem('lumi:theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
-  <link rel="stylesheet" href="style.css?v=home-tabs-1">
+  <link rel="stylesheet" href="style.css?v=voice-lumi-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar" hidden>
@@ -65,7 +65,7 @@
           <button type="button" class="icon-button" id="attach-photo" aria-label="Прикрепить фото" title="Прикрепить фото">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.4"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg>
           </button>
-          <button type="button" id="composer-more" aria-expanded="false" aria-controls="voice-panel"><span class="wave" aria-hidden="true"><i></i><i></i><i></i></span>Голос</button>
+          <button type="button" id="composer-more" aria-haspopup="dialog" aria-controls="voice-panel"><span class="wave" aria-hidden="true"><i></i><i></i><i></i></span>Голос</button>
           <button type="button" class="voice icon-button" id="voice" aria-label="Продиктовать текст"></button>
           <button class="send icon-button" aria-label="Отправить сообщение"></button>
         </div>
@@ -150,6 +150,33 @@
       <button type="button" class="tab" data-tab="profile"><span data-icon="user"></span>Профиль</button>
     </nav>
   </footer>
+  <dialog id="voice-panel" aria-labelledby="voice-title">
+    <div class="voice-screen">
+      <button type="button" id="voice-close" class="icon-button" aria-label="Закрыть голосовой режим">×</button>
+      <h2 id="voice-title">Голосовой чат</h2>
+      <div class="voice-orbit" aria-hidden="true">
+        <div class="lumi-mascot">
+          <span class="mascot-antenna"></span>
+          <span class="mascot-face"><i></i><i></i><b></b></span>
+        </div>
+      </div>
+      <p id="voice-status" role="status">Нажми «Говорить» и задай вопрос.</p>
+      <div class="voice-buttons">
+        <button type="button" id="voice-start" class="voice-action">Говорить</button>
+        <button type="button" id="voice-play" class="voice-action" hidden>Воспроизвести</button>
+      </div>
+      <label class="voice-choice">Голос
+        <select id="voice-gender">
+          <option value="female">Женский нейроголос</option>
+          <option value="male">Мужской нейроголос</option>
+          <option value="system">Голос устройства</option>
+        </select>
+      </label>
+      <button type="button" id="voice-read">Перейти к тексту</button>
+      <small class="voice-disclosure">Распознавание и нейроозвучка работают через Gemini.</small>
+      <audio id="voice-audio" preload="none"></audio>
+    </div>
+  </dialog>
   <dialog id="model-picker" aria-labelledby="model-title">
     <form method="dialog" class="model-sheet">
       <h2 id="model-title">Модель для чата</h2>
@@ -165,4 +192,4 @@
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=home-tabs-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=voice-lumi-1"></script></body></html>

@@ -76,7 +76,7 @@
     if (!rows.length) container.textContent = 'Здесь появятся твои чаты.';
   }
   function openDialog(id) {
-    if (preparingPhoto || activeRecorder || voicePending) return toast('Сначала закончи запись или подготовку вложения');
+    if (preparingPhoto || capture) return toast('Сначала закончи запись или подготовку вложения');
     if (id !== dialogId) {
       drafts.set(dialogId, {text: input.value, photo: draftPhoto});
       dialogId = id;
@@ -84,7 +84,7 @@
       input.value = drafts.get(id)?.text || '';
       showPhoto(drafts.get(id)?.photo || null);
       resizeInput();
-      voicePanel.open = false;
+      if (voicePanel.open) voicePanel.close();
       window.speechSynthesis?.cancel();
     }
     show('chat');
@@ -372,7 +372,7 @@
     frame(start);
   }
 
-  async function sendMessage(text, fromVoice, photo = null) {
+  async function sendMessage(text, session, photo = null) {
     const target = dialogId;
     if (pending.has(target)) return;
     const messages = dialogMessages(target);
@@ -387,7 +387,6 @@
     box.append(row);
     if (!API_ENDPOINT) {
       row.textContent = 'Сервер LUMI ещё не настроен. Сообщение сохранено на этом устройстве.';
-      if (fromVoice) speak(row.textContent);
       return;
     }
     row.innerHTML = 'Думаю<span class="waiting-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>';
@@ -436,8 +435,7 @@
       if (dialogId !== target) return;
       if (row.isConnected) revealReply(row, savedReply);
       else { pending.delete(target); renderChat(); }
-      if (fromVoice) speak(data.reply);
-      voiceStatus.textContent = 'Ответ LUMI готов.';
+      if (activeVoice(session)) speak(data.reply, session);
     } catch (error) {
       if (dialogId === target && !row.isConnected) { $('.waiting-turn')?.remove(); $('#messages').append(row); }
       row.textContent = error.message || 'Не удалось связаться с LUMI. Попробуй ещё раз.';
@@ -446,63 +444,262 @@
         input.value = text;
         resizeInput();
       }
-      if (fromVoice && row.isConnected) speak(row.textContent);
+      if (activeVoice(session)) voiceState('ready', row.textContent);
     } finally {
       pending.delete(target);
       syncComposer();
     }
   }
   renderChat();
-  const voicePanel=document.createElement('details');voicePanel.className='voice-panel';voicePanel.id='voice-panel';voicePanel.innerHTML='<summary>Голосовой режим</summary><div class="voice-title">ГОЛОСОВОЙ ВВОД И ОТВЕТ</div><div class="voice-controls"><button class="voice-start" type="button"><span></span>Говорить</button><label for="voice-gender">Голос ответа</label><select id="voice-gender" aria-label="Голос ответа"><option value="female">Женский</option><option value="male">Мужской</option></select></div><div class="voice-status" aria-live="polite">Нажми «Говорить», скажи фразу и нажми ещё раз.</div><small class="voice-privacy">Запись до 25 секунд отправляется в Gemini для распознавания. LUMI не сохраняет аудиофайл.</small>';
-  $('.composer').before(voicePanel);
-  voicePanel.addEventListener('toggle', () => $('#composer-more').setAttribute('aria-expanded', String(voicePanel.open)));
-  $('#composer-more').addEventListener('click',()=>{voicePanel.open=!voicePanel.open; if(voicePanel.open) voicePanel.scrollIntoView({block:'nearest',behavior:'smooth'});});
-  const voiceStart=$('.voice-start'),voiceStatus=$('.voice-status');
-  let activeRecorder=null,activeStream=null,recordedChunks=[],recordTimer=null,voiceRecordButton=null;
-  let voicePending = false;
-  function finishRecording(){if(activeRecorder?.state==='recording')activeRecorder.stop();}
-  async function toggleRecording(button,autoSend){
-    if(activeRecorder?.state==='recording'){finishRecording();return;}
-    if (voicePending || pending.has(dialogId)) return;
-    if(!API_ENDPOINT){voiceStatus.textContent='Сервер LUMI не настроен.';voicePanel.open=true;return;}
-    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){voiceStatus.textContent='Запись с микрофона не поддерживается в этом приложении. Открой LUMI в обновлённом Telegram.';voicePanel.open=true;return;}
-    try{
-      voicePanel.open=true;voiceStatus.textContent='Запрашиваю доступ к микрофону…';
-      voicePending=true;
-      activeStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,channelCount:1}});
-      const formats=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/mp4'];
-      const mimeType=formats.find(type=>MediaRecorder.isTypeSupported(type));
-      activeRecorder=mimeType?new MediaRecorder(activeStream,{mimeType}):new MediaRecorder(activeStream);
-      voiceRecordButton=button;recordedChunks=[];
-      activeRecorder.ondataavailable=e=>{if(e.data?.size)recordedChunks.push(e.data);};
-      activeRecorder.onerror=()=>{voiceStatus.textContent='Ошибка записи. Проверь разрешение микрофона в Telegram.';};
-      activeRecorder.onstop=async()=>{
-        clearTimeout(recordTimer);activeStream?.getTracks().forEach(track=>track.stop());activeStream=null;
-        const recorder=activeRecorder;activeRecorder=null;
-        voiceStart.disabled=false;$('#voice').disabled=false;voiceStart.textContent='Говорить';setIcon($('#voice'),'mic');
-        const blob=new Blob(recordedChunks,{type:recorder.mimeType||'audio/webm'});recordedChunks=[];
-        if(blob.size<1200){voiceStatus.textContent='Запись слишком короткая. Нажми «Говорить» и произнеси фразу.';return;}
-        if(blob.size>700000){voiceStatus.textContent='Запись длиннее 25 секунд. Попробуй сказать короче.';return;}
-        voicePending=true;
-        voiceStatus.textContent='Распознаю речь…';
-        try{
-          const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';
-          for(let offset=0;offset<bytes.length;offset+=0x8000)binary+=String.fromCharCode(...bytes.subarray(offset,offset+0x8000));
-          const mime=blob.type.split(';')[0].toLowerCase()||'audio/webm';
-          const result=await fetch(API_ENDPOINT.replace(/\/$/,'')+'/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:tg?.initData||'',mimeType:mime,audioBase64:btoa(binary)})});
-          const data=await result.json();if(!result.ok)throw new Error(data.error||'Не удалось распознать речь.');
-          if(autoSend)sendMessage(data.transcript,true);else{$('#chat-input').value=($('#chat-input').value+' '+data.transcript).trim();voiceStatus.textContent='Речь добавлена в сообщение.';$('#chat-input').focus();}
-        }catch(error){voiceStatus.textContent=error.message||'Не получилось обработать запись.';}finally{voicePending=false;}
-      };
-      voicePending=false;
-      activeRecorder.start();voiceStatus.textContent='Записываю… нажми ещё раз, чтобы закончить.';
-      if(button===voiceStart){voiceStart.textContent='Остановить';}else{setIcon($('#voice'),'spark');$('#voice').setAttribute('aria-label','Остановить запись');}
-      recordTimer=setTimeout(finishRecording,25000);
-    }catch(error){voicePending=false;activeStream?.getTracks().forEach(track=>track.stop());activeStream=null;activeRecorder=null;voiceStart.disabled=false;$('#voice').disabled=false;voiceStart.textContent='Говорить';setIcon($('#voice'),'mic');voicePanel.open=true;voiceStatus.textContent=error?.name==='NotAllowedError'?'Telegram не дал доступ к микрофону. Разреши микрофон для Telegram в настройках телефона и попробуй снова.':'Не удалось включить микрофон. Проверь разрешения Telegram и повтори попытку.';}
+  const voicePanel = $('#voice-panel');
+  const voiceStatus = $('#voice-status');
+  const voiceStart = $('#voice-start');
+  const voicePlay = $('#voice-play');
+  const voiceChoice = $('#voice-gender');
+  const audio = $('#voice-audio');
+  const dictation = $('#voice');
+  let capture = null;
+  let voiceSession = null;
+  let audioUrl = '';
+  let spokenText = '';
+  let deviceSpeech = false;
+  let speechHint = '';
+  const savedVoice = storage.read('voiceChoice', 'female');
+  if (['female', 'male', 'system'].includes(savedVoice)) voiceChoice.value = savedVoice;
+  voiceChoice.addEventListener('change', () => {
+    try { storage.write('voiceChoice', voiceChoice.value); } catch {}
+  });
+
+  function voiceState(state, message) {
+    voicePanel.dataset.state = state;
+    voiceStatus.textContent = message;
+    voiceStart.textContent = state === 'listening' ? 'Готово' : 'Говорить';
+    voiceStart.disabled = state === 'waiting';
+    voicePlay.textContent = state === 'speaking' ? 'Остановить' : 'Воспроизвести';
   }
-  voiceStart.addEventListener('click',()=>toggleRecording(voiceStart,true));
-  function speak(text){if(!window.speechSynthesis){voiceStatus.textContent='Озвучка не поддерживается браузером.';return;}const gender=$('#voice-gender').value;const utterance=new SpeechSynthesisUtterance(text);utterance.lang='ru-RU';utterance.rate=1;utterance.pitch=gender==='female'?1.12:.88;const voices=speechSynthesis.getVoices();const matching=voices.find(v=>/^ru/i.test(v.lang)&&new RegExp(gender==='female'?'female|woman|милена|алёна|алена|ирина|жен':'male|man|павел|юрий|муж','i').test(v.name));if(matching)utterance.voice=matching;speechSynthesis.cancel();speechSynthesis.speak(utterance);}
-  $('#voice').addEventListener('click',()=>toggleRecording($('#voice'),false));
+
+  function resetPlayback() {
+    audio.pause();
+    audio.removeAttribute('src');
+    window.speechSynthesis?.cancel();
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    audioUrl = '';
+    spokenText = '';
+    speechHint = '';
+    voicePlay.hidden = true;
+  }
+
+  function activeVoice(session) {
+    return !!session && session === voiceSession && voicePanel.open;
+  }
+
+  function finishPlayback() {
+    if (voicePanel.open && voicePanel.dataset.state === 'speaking') {
+      voiceState('ready', speechHint || 'Ответ сохранён в чате.');
+    }
+  }
+
+  audio.addEventListener('ended', finishPlayback);
+
+  async function playReply() {
+    const session = voiceSession;
+    if (!activeVoice(session) || !spokenText) return;
+    if (voicePanel.dataset.state === 'speaking') {
+      audio.pause();
+      window.speechSynthesis?.cancel();
+      finishPlayback();
+      return;
+    }
+    try {
+      if (deviceSpeech) {
+        if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) throw Error();
+        const utterance = new SpeechSynthesisUtterance(spokenText);
+        utterance.lang = /[а-яё]/i.test(spokenText) ? 'ru-RU' : 'en-US';
+        const locale = utterance.lang.slice(0, 2);
+        const voices = speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith(locale));
+        utterance.voice = voices.find(v => /enhanced|premium|natural|улучш/i.test(v.name)) || voices[0] || null;
+        utterance.onstart = () => { if (activeVoice(session)) voiceState('speaking', 'Фонарик говорит…'); };
+        utterance.onend = () => { if (activeVoice(session)) finishPlayback(); };
+        utterance.onerror = ({error}) => {
+          if (activeVoice(session) && !['interrupted', 'canceled'].includes(error)) {
+            voiceState('ready', 'Не удалось воспроизвести голос. Ответ есть в чате.');
+          }
+        };
+        speechSynthesis.speak(utterance);
+      } else {
+        audio.currentTime = 0;
+        await audio.play();
+        if (activeVoice(session) && !audio.paused) voiceState('speaking', 'Фонарик говорит…');
+      }
+    } catch {
+      if (activeVoice(session)) voiceState('ready', 'Нажми «Воспроизвести». Ответ есть в чате.');
+    }
+  }
+
+  voicePlay.addEventListener('click', playReply);
+
+  async function speak(text, session) {
+    if (!activeVoice(session)) return;
+    resetPlayback();
+    const plain = text.replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1')
+      .replace(/https?:\/\/\S+/gi, '').replace(/[*#\x60_]/g, '').replace(/\s+/g, ' ').trim();
+    if (!plain) { voiceState('ready', 'Ответ сохранён в чате.'); return; }
+    const voice = voiceChoice.value;
+    deviceSpeech = voice === 'system';
+    const excerpt = plain.length > 450 && !deviceSpeech;
+    spokenText = excerpt ? plain.slice(0, 450).replace(/\s+\S*$/, '').trim() : plain;
+    speechHint = excerpt ? 'Озвучено начало. Полный ответ в чате.' : '';
+    if (!deviceSpeech) {
+      voiceState('waiting', 'Готовлю озвучку…');
+      try {
+        const result = await fetch(API_ENDPOINT.replace(/\/$/, '') + '/speak', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          signal: session.signal,
+          body: JSON.stringify({initData: tg?.initData || '', voice, text: spokenText}),
+        });
+        if (!result.ok || !result.headers.get('Content-Type')?.startsWith('audio/')) throw Error();
+        const sound = await result.blob();
+        if (!activeVoice(session)) return;
+        audioUrl = URL.createObjectURL(sound);
+        audio.src = audioUrl;
+      } catch {
+        if (!activeVoice(session)) return;
+        deviceSpeech = true;
+        speechHint = 'Нейроголос недоступен. Использую голос устройства.';
+      }
+    }
+    voiceState('ready', speechHint || 'Ответ сохранён в чате.');
+    voicePlay.hidden = false;
+    await playReply();
+  }
+
+  function releaseCapture(turn) {
+    if (capture !== turn) return;
+    clearTimeout(turn.timer);
+    turn.stream?.getTracks().forEach(track => track.stop());
+    capture = null;
+    dictation.setAttribute('aria-label', 'Продиктовать текст');
+    setIcon(dictation, 'mic');
+  }
+
+  async function finishCapture(turn, chunks) {
+    if (capture !== turn) return;
+    clearTimeout(turn.timer);
+    turn.stream.getTracks().forEach(track => track.stop());
+    turn.stream = null;
+    dictation.setAttribute('aria-label', 'Продиктовать текст');
+    setIcon(dictation, 'mic');
+    const blob = new Blob(chunks, {type: turn.recorder.mimeType || 'audio/webm'});
+    const inform = message => turn.session ? voiceState('ready', message) : toast(message);
+    try {
+      if (blob.size < 1200) throw Error('Запись слишком короткая. Попробуй ещё раз.');
+      if (blob.size > 670000) throw Error('Запись слишком большая. Скажи чуть короче.');
+      if (turn.session) voiceState('waiting', 'Распознаю речь…');
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = '';
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+      }
+      const result = await fetch(API_ENDPOINT.replace(/\/$/, '') + '/transcribe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        signal: turn.controller.signal,
+        body: JSON.stringify({
+          initData: tg?.initData || '', mimeType: blob.type.split(';')[0].toLowerCase(), audioBase64: btoa(binary),
+        }),
+      });
+      const data = await result.json();
+      if (!result.ok || typeof data.transcript !== 'string' || !data.transcript.trim()) {
+        throw Error(data.error || 'Не удалось распознать речь.');
+      }
+      if (capture !== turn) return;
+      if (turn.session) {
+        voiceState('waiting', 'Фонарик думает…');
+        releaseCapture(turn);
+        await sendMessage(data.transcript, turn.session);
+        if (activeVoice(turn.session) && !spokenText && voiceStatus.textContent === 'Фонарик думает…') {
+          voiceState('ready', 'Проверь ответ в чате.');
+        }
+      } else {
+        input.value = (input.value + ' ' + data.transcript).trim();
+        resizeInput();
+        input.focus();
+      }
+    } catch (error) {
+      if (capture === turn && !turn.controller.signal.aborted) inform(error.message || 'Не удалось обработать запись.');
+    } finally {
+      releaseCapture(turn);
+    }
+  }
+
+  async function toggleRecording(session = null) {
+    if (capture?.recorder?.state === 'recording') {
+      capture.recorder.stop();
+      return;
+    }
+    if (capture || pending.has(dialogId)) return;
+    const inform = message => session ? voiceState('ready', message) : toast(message);
+    if (!API_ENDPOINT) return inform('Сервер LUMI недоступен.');
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      return inform('Запись с микрофона недоступна в этом браузере.');
+    }
+    const turn = {controller: new AbortController(), session};
+    capture = turn;
+    if (session) {
+      resetPlayback();
+      voiceState('waiting', 'Запрашиваю доступ к микрофону…');
+    }
+    try {
+      turn.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1}});
+      if (capture !== turn) { turn.stream.getTracks().forEach(track => track.stop()); return; }
+      const formats = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
+      const mimeType = formats.find(type => MediaRecorder.isTypeSupported(type));
+      const recorder = turn.recorder = new MediaRecorder(turn.stream, mimeType ? {mimeType} : undefined);
+      const chunks = [];
+      recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
+      recorder.onstop = () => finishCapture(turn, chunks);
+      recorder.onerror = () => {
+        if (capture !== turn) return;
+        releaseCapture(turn);
+        inform('Ошибка записи. Попробуй ещё раз.');
+      };
+      recorder.start();
+      turn.timer = setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 25000);
+      if (session) voiceState('listening', 'Слушаю. Нажми «Готово», когда закончишь.');
+      else {
+        dictation.setAttribute('aria-label', 'Остановить запись');
+        setIcon(dictation, 'spark');
+      }
+    } catch (error) {
+      if (capture !== turn) return;
+      releaseCapture(turn);
+      inform(error.name === 'NotAllowedError' ? 'Telegram не дал доступ к микрофону.' : 'Не удалось включить микрофон.');
+    }
+  }
+
+  $('#composer-more').addEventListener('click', () => {
+    voiceSession = new AbortController();
+    voiceState('ready', 'Нажми «Говорить» и задай вопрос.');
+    voicePanel.showModal();
+    tg?.BackButton?.show();
+  });
+  voicePanel.addEventListener('close', () => {
+    if (capture?.session && capture.session === voiceSession) {
+      const turn = capture;
+      turn.controller.abort();
+      releaseCapture(turn);
+      if (turn.recorder?.state === 'recording') turn.recorder.stop();
+    }
+    voiceSession?.abort();
+    voiceSession = null;
+    resetPlayback();
+    if (current === activeTab) tg?.BackButton?.hide();
+  });
+  $('#voice-close').addEventListener('click', () => voicePanel.close());
+  $('#voice-read').addEventListener('click', () => voicePanel.close());
+  voiceStart.addEventListener('click', () => toggleRecording(voiceSession));
+  dictation.addEventListener('click', () => toggleRecording());
   function renderTasks(){const tasks=storage.read('tasks');const list=$('#tasks-list');list.innerHTML='';$('#day-count').textContent=tasks.length?`Выполнено: ${tasks.filter(t=>t.done).length} из ${tasks.length}`:'Нет дел';if(!tasks.length){list.innerHTML='<div class="empty">Планов пока нет. Добавь то, о чём хочется помнить.</div>';return;}tasks.forEach(t=>{const row=document.createElement('div');row.className='entry task-entry'+(t.done?' done':'');row.innerHTML=`<button class="check" aria-label="Отметить план">${t.done?'✓':''}</button><span></span><button class="remove" aria-label="Удалить">×</button>`;row.querySelector('span').textContent=t.text;row.querySelector('.check').onclick=()=>{t.done=!t.done;storage.write('tasks',tasks);renderTasks()};row.querySelector('.remove').onclick=()=>{storage.write('tasks',tasks.filter(x=>x.id!==t.id));renderTasks()};list.append(row);});}
   $('#task-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#task-input'),text=input.value.trim();if(!text)return;const tasks=storage.read('tasks');tasks.unshift({id:Date.now(),text,done:false});storage.write('tasks',tasks);input.value='';renderTasks()});renderTasks();
   function renderNotes(){const notes=storage.read('notes');const list=$('#notes-list');list.innerHTML='';if(!notes.length){list.innerHTML='<div class="empty">Здесь появятся сохранённые заметки.</div>';return;}notes.forEach(n=>{const row=document.createElement('div');row.className='entry';row.innerHTML='<span></span><button aria-label="Удалить заметку">×</button>';row.querySelector('span').textContent=n.text;const small=document.createElement('small');small.textContent=new Date(n.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});row.querySelector('span').append(small);row.querySelector('button').onclick=()=>{storage.write('notes',notes.filter(x=>x.id!==n.id));renderNotes()};list.append(row);});}
@@ -602,7 +799,7 @@
   scheduleSync();
   function renderHistory(){ recentList($('#history-list'), Infinity); }
   function deleteDialog(id) {
-    if (pending.has(id) || (id === dialogId && (preparingPhoto || activeRecorder || voicePending))) {
+    if (pending.has(id) || (id === dialogId && (preparingPhoto || capture))) {
       toast('Сначала дождись завершения текущего действия');
       return;
     }
@@ -622,7 +819,7 @@
       input.value = '';
       showPhoto(null);
       resizeInput();
-      voicePanel.open = false;
+      if (voicePanel.open) voicePanel.close();
       window.speechSynthesis?.cancel();
       renderChat();
       syncComposer();
@@ -678,7 +875,8 @@
     finally {loadingNews=false;}
   }
   tg?.BackButton?.onClick(() => {
-    if (modelPicker.open) modelPicker.close();
+    if (voicePanel.open) voicePanel.close();
+    else if (modelPicker.open) modelPicker.close();
     else if (menu.open) menu.close();
     else goBack();
   });
