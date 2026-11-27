@@ -1,7 +1,11 @@
 export const novaModel = 'lumi-nova';
 
 export function novaConfigured(env) {
-  return Boolean(env.YANDEX_API_KEY?.trim() && /^[a-z0-9-]{1,64}$/i.test(env.YANDEX_FOLDER_ID?.trim() || ''));
+  return Boolean(env.OPENAI_API_KEY?.trim() && /^[1-9]\d{0,15}$/.test(env.NOVA_TELEGRAM_ID?.trim() || ''));
+}
+
+export function novaAvailableTo(env, user) {
+  return novaConfigured(env) && String(user?.id) === env.NOVA_TELEGRAM_ID.trim();
 }
 
 function novaError(message, status = 502) {
@@ -10,7 +14,6 @@ function novaError(message, status = 502) {
 
 export async function requestNova(env, system, contents, options) {
   if (!novaConfigured(env)) throw novaError('Lumi 1.2 Nova ещё не подключена.', 503);
-  const folder = env.YANDEX_FOLDER_ID.trim();
   const declarations = options.tools?.flatMap(tool => tool.functionDeclarations) || [];
   const required = options.toolConfig?.functionCallingConfig?.mode === 'ANY';
   const messages = [{
@@ -18,7 +21,11 @@ export async function requestNova(env, system, contents, options) {
     content: system + (required ? ' Текущий вопрос требует внешнего источника. Выбери подходящую функцию, чтобы получить данные.' : ''),
   }, ...contents.map(item => ({
     role: item.role === 'model' ? 'assistant' : 'user',
-    content: item.parts.map(part => part.text || '').join('\n\n'),
+    content: item.parts.some(part => part.inlineData)
+      ? item.parts.map(part => part.inlineData
+        ? {type: 'image_url', image_url: {url: 'data:image/jpeg;base64,' + part.inlineData.data}}
+        : {type: 'text', text: part.text})
+      : item.parts.map(part => part.text).join('\n\n'),
   }))];
   const tools = declarations.map(({name, description, parameters}) => ({
     type: 'function',
@@ -34,34 +41,41 @@ export async function requestNova(env, system, contents, options) {
   }));
   let response;
   try {
-    response = await fetch('https://ai.api.cloud.yandex.net/v1/chat/completions', {
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
+      redirect: 'error',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Api-Key ' + env.YANDEX_API_KEY.trim(),
-        'OpenAI-Project': folder,
+        Authorization: 'Bearer ' + env.OPENAI_API_KEY.trim(),
       },
       signal: AbortSignal.timeout(options.timeout || 18000),
       body: JSON.stringify({
-        model: 'gpt://' + folder + '/aliceai-llm-flash',
+        model: 'gpt-6-luna',
         messages,
-        max_tokens: options.generationConfig?.maxOutputTokens || 1600,
-        temperature: 0.4,
-        ...(tools.length && {tools, tool_choice: 'auto'}),
+        store: false,
+        reasoning_effort: 'none',
+        max_completion_tokens: options.generationConfig?.maxOutputTokens || 1600,
+        ...(tools.length && {tools, tool_choice: required ? 'required' : 'auto', parallel_tool_calls: false}),
       }),
     });
   } catch {
     throw novaError('Lumi 1.2 Nova не успела ответить. Попробуй ещё раз.');
   }
-  if (response.status === 429) throw novaError('Достигнут лимит Lumi 1.2 Nova. Попробуй позже.', 429);
+  const result = await response.json().catch(() => null);
+  if (response.status === 429) {
+    if (['insufficient_quota', 'credit_balance_exhausted'].includes(result?.error?.code)) {
+      throw novaError('Для Lumi 1.2 Nova закончилась квота OpenAI API. Проверь баланс.', 503);
+    }
+    throw novaError('Достигнут лимит Lumi 1.2 Nova. Попробуй позже.', 429);
+  }
   if (response.status === 401 || response.status === 403) {
     throw novaError('Lumi 1.2 Nova не получила доступ. Проверь настройки подключения.', 503);
   }
   if (!response.ok) throw novaError('Lumi 1.2 Nova временно недоступна.');
-  const result = await response.json().catch(() => null);
   const message = result?.choices?.[0]?.message;
   const parts = [];
-  if (typeof message?.content === 'string' && message.content.trim()) parts.push({text: message.content});
+  const reply = [message?.content, message?.refusal].find(value => typeof value === 'string' && value.trim());
+  if (reply) parts.push({text: reply});
   for (const toolCall of Array.isArray(message?.tool_calls) ? message.tool_calls : []) {
     const call = toolCall?.function;
     if (!declarations.some(declaration => declaration.name === call?.name)) continue;

@@ -104,6 +104,12 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
   const date = new Date();
   $('#day-long-date').textContent = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long'}).format(date).toUpperCase();
   const profileForm = $('#profile-form');
+  const telegramId = tg?.initDataUnsafe?.user?.id;
+  if (telegramId) {
+    const idField = $('#profile-telegram-id');
+    idField.value = String(telegramId);
+    idField.closest('label').hidden = false;
+  }
   function renderProfile() {
     const {name = '', city = ''} = storage.read('profile', {});
     const displayName = name || tg?.initDataUnsafe?.user?.first_name || '';
@@ -140,8 +146,11 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
   let novaCheck;
   let modelTrigger;
   function checkNova() {
-    if (!API_ENDPOINT || novaCheck) return;
-    novaCheck = fetch(API_ENDPOINT.replace(/\/$/, '') + '/health')
+    if (!API_ENDPOINT || !tg?.initData || novaCheck) return;
+    novaCheck = fetch(API_ENDPOINT.replace(/\/$/, '') + '/models', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({initData: tg.initData}),
+    })
       .then(result => result.ok ? result.json() : null)
       .then(status => {
         if (status) novaAvailable = status.novaAvailable === true;
@@ -279,7 +288,6 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
     if (preparingPhoto) return toast('Фото готовится…');
     const caption = input.value.trim();
     if (input.disabled || (!caption && !draftPhoto)) return;
-    if (draftPhoto && selectedModel === 'lumi-nova') return toast('Для анализа фото выбери Lumi 1.1 Flash.');
     if (caption.length > 4000) return toast('Сообщение должно быть короче 4001 символа');
     const photo = draftPhoto;
     showPhoto(null);

@@ -45,11 +45,8 @@ Worker конфигурирован для текущего публичного
 
 ### Lumi 1.2 Nova
 
-Nova использует Alice AI LLM Flash из Yandex AI Studio. Создайте [API-ключ для AI Studio](https://aistudio.yandex.ru/ru/docs/ai-studio/operations/get-api-key), скопируйте его секретную часть и идентификатор каталога сервисного аккаунта.
+Nova использует [GPT‑6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna). Она отвечает на текст, анализирует вложенные фото и формулирует ответы на расшифрованные голосовые реплики. Распознавание и озвучка остаются в существующем голосовом сервисе.
 
-В Cloudflare откройте **Workers & Pages → lumi-ai-api → Settings → Variables and Secrets**. Добавьте два значения типа **Secret** и нажмите **Deploy**:
-
-- `YANDEX_API_KEY` — секретная часть API-ключа.
-- `YANDEX_FOLDER_ID` — идентификатор каталога.
-
-После публикации откройте меню моделей в LUMI и выберите **Lumi 1.2 Nova**. Код использует [Chat Completions API](https://aistudio.yandex.ru/ru/docs/ai-studio/operations/generation/completions-basic) с тарификацией по потреблению. Как текстовый режим Nova отвечает на сообщения и расшифрованные голосовые реплики. Для анализа вложенных фото можно выбрать **Lumi 1.1 Flash**.
+1. Проверьте [доступность OpenAI API в вашем регионе](https://help.openai.com/en/articles/7947663-chatgpt-and-openai-api-supported-countries-and-territories). [Оплата API](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform) ведётся отдельно от подписки ChatGPT. Создайте [ключ проекта OpenAI](https://platform.openai.com/api-keys) с доступом к Chat Completions.
+2. В Cloudflare откройте **Workers & Pages → lumi-ai-api → Settings → Variables and Secrets**. Добавьте два секрета `OPENAI_API_KEY` и `NOVA_TELEGRAM_ID` с числовым ID из вкладки «Профиль» в LUMI. Сохраните и разверните настройки. Ключ вводится только в Cloudflare.
+3. Откройте LUMI из Telegram и выберите **Lumi 1.2 Nova** в меню моделей. Worker сверяет подписанные данные Telegram с заданным ID. Оплачиваемый режим доступен только этому аккаунту.
