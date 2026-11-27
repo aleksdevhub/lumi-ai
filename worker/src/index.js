@@ -3,6 +3,7 @@ import {answer, answerAudio, transcribeAudio} from './assistant.js';
 import {imageRequest} from '../../intents.mjs';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
+import {novaConfigured, novaModel} from './nova.js';
 export {PcRelay};
 const encoder = new TextEncoder();
 const recent = new Map();
@@ -78,6 +79,7 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
       ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
+      novaAvailable: novaConfigured(env),
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
@@ -213,7 +215,7 @@ export default {
     const maxBody = photoRequest ? 1650000 : 24000;
     const length = Number(request.headers.get("Content-Length") || 0);
     if (length > maxBody) return response({ error: "Слишком большой запрос" }, 413, allowed);
-    if (!env.GEMINI_API_KEY || !env.TELEGRAM_BOT_TOKEN) return response({ error: "Backend secrets are not configured" }, 503, allowed);
+    if (!env.TELEGRAM_BOT_TOKEN) return response({ error: "Backend secrets are not configured" }, 503, allowed);
     let body;
     try {
       const reader = request.body.getReader();
@@ -232,8 +234,10 @@ export default {
       body = JSON.parse(raw + decoder.decode());
       if (!body || typeof body !== "object") throw Error();
     } catch { return response({ error: "Invalid JSON" }, 400, allowed); }
-    const user = await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN);
+    const user = typeof body.initData === 'string' ? await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN) : null;
     if (!user?.id) return response({ error: "Open LUMI from Telegram to chat" }, 401, allowed);
+    if (body.model !== novaModel && !env.GEMINI_API_KEY) return response({error: 'Модель временно недоступна.'}, 503, allowed);
+    if (photoRequest && body.model === novaModel) return response({error: 'Для анализа фото выбери Lumi 1.1 Flash.'}, 422, allowed);
     const now = Date.now();
     const key = String(user.id);
     const times = (recent.get(key) || []).filter(t => now - t < 60000);
@@ -281,6 +285,7 @@ export default {
       const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0,500) : '';
       return response(await answer(env,contents,preferences,body.memory,body.model,false,localContext(body)),200,allowed);
     } catch (error) {
+      if (error.isNova) return response({error: error.message}, error.status, allowed);
       return response({error:error.status===429?'Достигнут лимит модели. Попробуй позже.':'Не удалось получить ответ от модели. Попробуй позже.'},error.status===429?429:502,allowed);
     }
   }

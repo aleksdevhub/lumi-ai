@@ -42,3 +42,14 @@ API находится в `worker/`. Worker принимает сообщени�
 4. Откройте Mini App из Telegram и проверьте текстовый и голосовой обмен.
 
 Worker конфигурирован для текущего публичного Pages origin `https://aleksdevhub.github.io`. Для локальной разработки или смены домена измените `ALLOWED_ORIGIN` в `worker/wrangler.jsonc`. Нужен валидный bot token для проверки Telegram initData; вводите его только в секреты Cloudflare, не присылайте в чат.
+
+### Lumi 1.2 Nova
+
+Nova использует Alice AI LLM Flash из Yandex AI Studio. Создайте [API-ключ для AI Studio](https://aistudio.yandex.ru/ru/docs/ai-studio/operations/get-api-key), скопируйте его секретную часть и идентификатор каталога сервисного аккаунта.
+
+В Cloudflare откройте **Workers & Pages → lumi-ai-api → Settings → Variables and Secrets**. Добавьте два значения типа **Secret** и нажмите **Deploy**:
+
+- `YANDEX_API_KEY` — секретная часть API-ключа.
+- `YANDEX_FOLDER_ID` — идентификатор каталога.
+
+После публикации откройте меню моделей в LUMI и выберите **Lumi 1.2 Nova**. Код использует [Chat Completions API](https://aistudio.yandex.ru/ru/docs/ai-studio/operations/generation/completions-basic) с тарификацией по потреблению. Как текстовый режим Nova отвечает на сообщения и расшифрованные голосовые реплики. Для анализа вложенных фото можно выбрать **Lumi 1.1 Flash**.

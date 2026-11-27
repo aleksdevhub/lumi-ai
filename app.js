@@ -29,7 +29,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
     try { localStorage.setItem('lumi:theme', theme.value); }
     catch { toast('Не удалось сохранить тему на устройстве'); }
   });
-  const modelLabels = {'lumi-1': 'Lumi 1.0', 'lumi-flash': 'Lumi 1.1 Flash'};
+  const modelLabels = {'lumi-1': 'Lumi 1.0', 'lumi-flash': 'Lumi 1.1 Flash', 'lumi-nova': 'Lumi 1.2 Nova'};
   let selectedModel = storage.read('selectedModel', 'lumi-flash');
   if (!Object.hasOwn(modelLabels, selectedModel)) selectedModel = 'lumi-flash';
   const prefix = 'lumi:dialog:';
@@ -135,7 +135,22 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
   fitViewport();
   const menu = $('#menu');
   const modelPicker = $('#model-picker');
+  const novaOption = $('#nova-option');
+  let novaAvailable = false;
+  let novaCheck;
   let modelTrigger;
+  function checkNova() {
+    if (!API_ENDPOINT || novaCheck) return;
+    novaCheck = fetch(API_ENDPOINT.replace(/\/$/, '') + '/health')
+      .then(result => result.ok ? result.json() : null)
+      .then(status => {
+        if (status) novaAvailable = status.novaAvailable === true;
+        novaOption.hidden = !novaAvailable && selectedModel !== 'lumi-nova';
+        novaOption.querySelector('input').disabled = !novaAvailable;
+      })
+      .catch(() => {})
+      .finally(() => { novaCheck = null; });
+  }
   function renderModel() {
     $$('[data-model-label]').forEach(label => { label.textContent = modelLabels[selectedModel]; });
     $('#open-model').setAttribute('aria-label', 'Выбрать модель: ' + modelLabels[selectedModel]);
@@ -143,13 +158,16 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
   }
   renderModel();
   modelPicker.querySelector('form').addEventListener('submit', () => {
-    selectedModel = modelPicker.querySelector('input:checked').value;
+    const selected = modelPicker.querySelector('input:checked');
+    if (!selected || selected.disabled) return;
+    selectedModel = selected.value;
     renderModel();
     try { storage.write('selectedModel', selectedModel); } catch {}
   });
   $$('[data-model]').forEach(button => button.addEventListener('click', () => {
     modelTrigger = button;
     renderModel();
+    checkNova();
     modelPicker.showModal();
     tg?.BackButton?.show();
   }));
@@ -261,6 +279,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
     if (preparingPhoto) return toast('Фото готовится…');
     const caption = input.value.trim();
     if (input.disabled || (!caption && !draftPhoto)) return;
+    if (draftPhoto && selectedModel === 'lumi-nova') return toast('Для анализа фото выбери Lumi 1.1 Flash.');
     if (caption.length > 4000) return toast('Сообщение должно быть короче 4001 символа');
     const photo = draftPhoto;
     showPhoto(null);
