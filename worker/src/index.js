@@ -2,6 +2,7 @@ import {worldNews} from './live.js';
 import {answer, answerAudio, maxToolRounds, novaBackupModel, novaModel, novaThinking, transcribeAudio} from './assistant.js';
 import {imageRequest} from '../../intents.mjs';
 import {normalizePersonalMemory} from '../../personal-memory.mjs';
+import {normalizeSources} from '../../source-followup.mjs';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
 export {PcRelay};
@@ -16,6 +17,7 @@ function localContext(body) {
     city: typeof body.weatherCity === 'string' ? body.weatherCity.trim().slice(0, 60) : '',
     timeZone: typeof body.timeZone === 'string' && body.timeZone.length <= 64 ? body.timeZone : 'UTC',
     personalMemory: normalizePersonalMemory(body.personalMemory),
+    previousSources: normalizeSources(body.previousSources),
   };
 }
 
@@ -80,7 +82,7 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
       ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather","calculate"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
-      novaProvider: 'gemini', novaModel, novaThinking, novaBackupModel, novaLiteBackup: true, maxToolRounds, personalMemory: true, draftReview: true, datedHeadlines: true,
+      novaProvider: 'gemini', novaModel, novaThinking, novaBackupModel, novaLiteBackup: true, maxToolRounds, personalMemory: true, draftReview: true, datedHeadlines: true, sourceFollowup: true,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))

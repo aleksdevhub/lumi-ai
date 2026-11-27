@@ -2,6 +2,7 @@ import {lookup,readPage,worldNews} from './live.js';
 import {newsRequest,weatherRequest,imageRequest} from '../../intents.mjs';
 import {calculate} from './calculator.js';
 import {rememberRequest} from '../../personal-memory.mjs';
+import {sourceReference} from '../../source-followup.mjs';
 
 const tools = [{functionDeclarations:[
   {name:'read_page',description:'Read the public HTTPS page explicitly provided by the user for analysis. Pass its exact URL.',parameters:{type:'OBJECT',properties:{query:{type:'STRING'}},required:['query']}},
@@ -177,6 +178,16 @@ export async function answer(env, contents, preferences, memory = [], selection,
   const model = chatModel(env, selection);
   if (contents.at(-1).parts.length === 1) {
     const question = contents.at(-1).parts[0].text;
+    const reference = /https:\/\//i.test(question) ? null : sourceReference(question);
+    if (reference && (reference.explicit || context.previousSources?.length)) {
+      const source = context.previousSources?.[reference.number - 1];
+      if (!source) {
+        return {reply: context.previousSources?.length
+          ? 'В предыдущей подборке нет доступного источника под номером ' + reference.number + '. Укажи другой номер или пришли ссылку.'
+          : 'В этом чате пока нет подборки источников. Пришли ссылку на публикацию или попроси показать новости.'};
+      }
+      return answerWithModel(env, model, contents, preferences, memory, forceLive, {...context, source});
+    }
     const headlines = newsRequest(question);
     if (headlines?.direct && !headlines.analysis && !forceLive) return headlinesReply(headlines, context.timeZone);
     const weather = weatherRequest(question);
@@ -260,7 +271,8 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
   const direct=question.match(/^\/(поиск|погода|новости)(?:\s+([\s\S]*))?$/i);
   let name,query;
   const explicitRead=question.match(/^\s*\/(?:прочитай|read)\s+(https:\/\/[^\s]+)(?:\s|$)/iu);
-  if(explicitRead) { name='read_page'; query=explicitRead[1]; }
+  if (context.source) { name='read_page'; query=context.source.url; }
+  else if(explicitRead) { name='read_page'; query=explicitRead[1]; }
   else if(direct) {
     name=({'поиск':'search','погода':'weather','новости':'news'})[direct[1].toLowerCase()];
     query=direct[2]?.trim()||'';
@@ -403,9 +415,14 @@ async function lookupReply(name, query, question, context) {
   let page;
   if(name==='read_page') {
     const provided=(question.match(/https:\/\/[^\s<>"«»]+/g)||[]).map(s=>s.replace(/[.,!?;)]+$/,''));
-    if(!provided.includes(query)) return {reply:'Пришли публичную HTTPS-ссылку на страницу.'};
+    if(!provided.includes(query) && context.source?.url !== query) return {reply:'Пришли публичную HTTPS-ссылку на страницу.'};
     page=await readPage(query);
-    if(!page) return {reply:'Не удалось прочитать страницу. Проверь публичную ссылку или пришли текст.'};
+    if (!page) {
+      return {
+        reply:'Не удалось прочитать публикацию. Открой ссылку или пришли текст, и я разберу его.',
+        ...(context.source && {sources: [context.source], checkedAt: new Date().toISOString()}),
+      };
+    }
     rows=[page];
   } else {
     rows=await lookup(name,query);

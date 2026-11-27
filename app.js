@@ -566,6 +566,14 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
       role: m.role, text: (m.role === 'assistant' ? replyDetails(m.text).body.slice(0, replyLimit) : m.text) || (m.thumb ? 'Фото' : ''),
     }));
   }
+  function recentArticleSources(messages) {
+    for (const message of messages.slice(-8).reverse()) {
+      if (message.role !== 'assistant') continue;
+      const details = replyDetails(message.text);
+      if (!details.cards && details.links?.length) return details.links.slice(0, 6);
+    }
+    return [];
+  }
 
   async function sendMessage(text, session, photo = null, prepared = null) {
     const target = dialogId;
@@ -610,6 +618,7 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           memory: relatedNotes(text),
           personalMemory: personalNotes(),
+          previousSources: recentArticleSources(messages),
           messages: nova ? modelHistory(messages, 24, 10000) : modelHistory(messages, 16),
         };
         const weather = !photo && weatherRequest(text);
@@ -894,6 +903,7 @@ import {normalizePersonalMemory, personalMemoryEntryLimit, personalMemoryKey, pe
           model: turn.model,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           history: modelHistory(dialogMessages(dialogId), 8).map(message => ({...message, text: message.text.slice(0, 1200)})),
+          previousSources: recentArticleSources(dialogMessages(dialogId)),
           preferences: storage.read('replyPrefs', ''),
           personalMemory: personalNotes(),
         }),
