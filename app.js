@@ -2,7 +2,7 @@
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
   const API_ENDPOINT=window.LUMI_API_URL||'';
-  const iconPaths={settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2.2 2.2m9.6 9.6L19 19M5 19l2.2-2.2m9.6-9.6L19 5"/><circle cx="12" cy="12" r="7"/>',home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',chat:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 4a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>',map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15m6-12v15"/>',note:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/>',news:'<path d="M4 4h16v16H4z"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/>',mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/>',send:'<path d="M12 19V5m-7 7 7-7 7 7"/>',arrow:'<path d="M7 17 17 7M7 7h10v10"/>',spark:'<path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/><path d="m19 14 1.2 2.8L23 18l-2.8 1.2L19 22l-1.2-2.8L15 18l2.8-1.2z"/>'};
+  const iconPaths={shortcut:'<rect x="4" y="3" width="16" height="18" rx="4"/><path d="M8 12h8m-4-4v8"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2.2 2.2m9.6 9.6L19 19M5 19l2.2-2.2m9.6-9.6L19 5"/><circle cx="12" cy="12" r="7"/>',home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',chat:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 4a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>',map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15m6-12v15"/>',note:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/>',news:'<path d="M4 4h16v16H4z"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/>',mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/>',send:'<path d="M12 19V5m-7 7 7-7 7 7"/>',arrow:'<path d="M7 17 17 7M7 7h10v10"/>',spark:'<path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/><path d="m19 14 1.2 2.8L23 18l-2.8 1.2L19 22l-1.2-2.8L15 18l2.8-1.2z"/>'};
   function svgIcon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name]||iconPaths.spark}</svg>`}
   function setIcon(el,name){if(el)el.innerHTML=svgIcon(name)}
   $$('[data-icon]').forEach(element => setIcon(element, element.dataset.icon));
@@ -28,6 +28,9 @@
     try { localStorage.setItem('lumi:theme', theme.value); }
     catch { toast('Не удалось сохранить тему на устройстве'); }
   });
+  const modelLabels = {'lumi-1': 'Lumi 1.0', 'lumi-flash': 'Lumi 1.1 Flash'};
+  let selectedModel = storage.read('selectedModel', 'lumi-flash');
+  if (!Object.hasOwn(modelLabels, selectedModel)) selectedModel = 'lumi-flash';
   const prefix = 'lumi:dialog:';
   const uid = () => crypto.randomUUID();
   const legacy = storage.read('messages');
@@ -132,8 +135,20 @@
   const menu = $('#menu');
   const modelPicker = $('#model-picker');
   let modelTrigger;
+  function renderModel() {
+    $$('[data-model-label]').forEach(label => { label.textContent = modelLabels[selectedModel]; });
+    $('#open-model').setAttribute('aria-label', 'Выбрать модель: ' + modelLabels[selectedModel]);
+    modelPicker.querySelector('input[value="' + selectedModel + '"]').checked = true;
+  }
+  renderModel();
+  modelPicker.querySelector('form').addEventListener('submit', () => {
+    selectedModel = modelPicker.querySelector('input:checked').value;
+    renderModel();
+    try { storage.write('selectedModel', selectedModel); } catch {}
+  });
   $$('[data-model]').forEach(button => button.addEventListener('click', () => {
     modelTrigger = button;
+    renderModel();
     modelPicker.showModal();
     tg?.BackButton?.show();
   }));
@@ -241,6 +256,7 @@
   };
   $('#chat-form').addEventListener('submit', event => {
     event.preventDefault();
+    if (capture?.committed) return toast('Дождись ответа на голосовую реплику.');
     if (preparingPhoto) return toast('Фото готовится…');
     const caption = input.value.trim();
     if (input.disabled || (!caption && !draftPhoto)) return;
@@ -372,7 +388,13 @@
     frame(start);
   }
 
-  async function sendMessage(text, session, photo = null) {
+  function modelHistory(messages, count) {
+    return messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-count).map(m => ({
+      role: m.role, text: (m.role === 'assistant' ? separateSources(m.text).body.slice(0, 4000) : m.text) || (m.thumb ? 'Фото' : ''),
+    }));
+  }
+
+  async function sendMessage(text, session, photo = null, prepared = null) {
     const target = dialogId;
     if (pending.has(target)) return;
     const messages = dialogMessages(target);
@@ -397,25 +419,30 @@
     $('#attach-photo').disabled = true;
     $('.send').disabled = true;
     try {
-      const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-16);
-      const payload = {
-        initData: tg?.initData || '',
-        preferences: storage.read('replyPrefs',''),
-        memory: relatedNotes(text),
-        messages: history.map(m => ({role: m.role, text: (m.role==='assistant'?separateSources(m.text).body.slice(0,4000):m.text) || (m.thumb ? 'Фото' : '')}))
-      };
-      while(payload.messages.length>1 && new TextEncoder().encode(JSON.stringify(payload)).length>23500) payload.messages.shift();
-      if (photo) payload.photo = photo.data;
-      const path = photo ? '/chat/photo' : '/chat';
-      const response = await fetch(API_ENDPOINT.replace(/\/$/, '') + path, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (!response.ok || typeof data.reply !== 'string' || !data.reply.trim()) {
-        throw new Error(data.error || 'Не удалось получить ответ');
+      let data = prepared;
+      if (prepared?.replyError) throw new Error(prepared.replyError);
+      if (!data) {
+        const payload = {
+          initData: tg?.initData || '',
+          preferences: storage.read('replyPrefs', ''),
+          model: selectedModel,
+          memory: relatedNotes(text),
+          messages: modelHistory(messages, 16),
+        };
+        while (payload.messages.length > 1 && new TextEncoder().encode(JSON.stringify(payload)).length > 23500) {
+          payload.messages.shift();
+        }
+        if (photo) payload.photo = photo.data;
+        const path = photo ? '/chat/photo' : '/chat';
+        const response = await fetch(API_ENDPOINT.replace(/\/$/, '') + path, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        });
+        data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Не удалось получить ответ');
       }
+      if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('Модель не вернула ответ.');
       const historyNow = dialogMessages(target);
       if (!historyNow.some(m => m.id === messages.at(-1).id)) return;
       if(memoryEnabled.checked && data.note?.url && data.note.excerpt) {
@@ -433,7 +460,7 @@
       saveDialog(target, historyNow);
       scheduleSync();
       if (dialogId !== target) return;
-      if (row.isConnected) revealReply(row, savedReply);
+      if (row.isConnected && !session) revealReply(row, savedReply);
       else { pending.delete(target); renderChat(); }
       if (activeVoice(session)) speak(data.reply, session);
     } catch (error) {
@@ -457,7 +484,7 @@
   const voicePlay = $('#voice-play');
   const voiceChoice = $('#voice-gender');
   const audio = $('#voice-audio');
-  const dictation = $('#voice');
+  const microphone = $('#voice');
   let capture = null;
   let voiceSession = null;
   let audioUrl = '';
@@ -579,8 +606,6 @@
     clearTimeout(turn.timer);
     turn.stream?.getTracks().forEach(track => track.stop());
     capture = null;
-    dictation.setAttribute('aria-label', 'Продиктовать текст');
-    setIcon(dictation, 'mic');
   }
 
   async function finishCapture(turn, chunks) {
@@ -588,14 +613,12 @@
     clearTimeout(turn.timer);
     turn.stream.getTracks().forEach(track => track.stop());
     turn.stream = null;
-    dictation.setAttribute('aria-label', 'Продиктовать текст');
-    setIcon(dictation, 'mic');
     const blob = new Blob(chunks, {type: turn.recorder.mimeType || 'audio/webm'});
-    const inform = message => turn.session ? voiceState('ready', message) : toast(message);
+    const inform = message => activeVoice(turn.session) ? voiceState('ready', message) : toast(message);
     try {
       if (blob.size < 1200) throw Error('Запись слишком короткая. Попробуй ещё раз.');
       if (blob.size > 670000) throw Error('Запись слишком большая. Скажи чуть короче.');
-      if (turn.session) voiceState('waiting', 'Распознаю речь…');
+      if (activeVoice(turn.session)) voiceState('waiting', 'Фонарик слушает запись и готовит ответ…');
       const bytes = new Uint8Array(await blob.arrayBuffer());
       let binary = '';
       for (let offset = 0; offset < bytes.length; offset += 0x8000) {
@@ -606,7 +629,13 @@
         headers: {'Content-Type': 'application/json'},
         signal: turn.controller.signal,
         body: JSON.stringify({
-          initData: tg?.initData || '', mimeType: blob.type.split(';')[0].toLowerCase(), audioBase64: btoa(binary),
+          initData: tg?.initData || '',
+          mimeType: blob.type.split(';')[0].toLowerCase(),
+          audioBase64: btoa(binary),
+          conversation: true,
+          model: turn.model,
+          history: modelHistory(dialogMessages(dialogId), 8).map(message => ({...message, text: message.text.slice(0, 1200)})),
+          preferences: storage.read('replyPrefs', ''),
         }),
       });
       const data = await result.json();
@@ -614,17 +643,11 @@
         throw Error(data.error || 'Не удалось распознать речь.');
       }
       if (capture !== turn) return;
-      if (turn.session) {
-        voiceState('waiting', 'Фонарик думает…');
-        releaseCapture(turn);
-        await sendMessage(data.transcript, turn.session);
-        if (activeVoice(turn.session) && !spokenText && voiceStatus.textContent === 'Фонарик думает…') {
-          voiceState('ready', 'Проверь ответ в чате.');
-        }
-      } else {
-        input.value = (input.value + ' ' + data.transcript).trim();
-        resizeInput();
-        input.focus();
+      if (activeVoice(turn.session)) voiceState('waiting', 'Фонарик думает…');
+      releaseCapture(turn);
+      await sendMessage(data.transcript, turn.session, null, data.reply || data.replyError ? data : null);
+      if (activeVoice(turn.session) && voiceStatus.textContent === 'Фонарик думает…') {
+        voiceState('ready', 'Проверь ответ в чате.');
       }
     } catch (error) {
       if (capture === turn && !turn.controller.signal.aborted) inform(error.message || 'Не удалось обработать запись.');
@@ -633,29 +656,34 @@
     }
   }
 
-  async function toggleRecording(session = null) {
+  function submitCapture(turn) {
+    turn.committed = true;
+    turn.recorder.stop();
+  }
+
+  async function toggleRecording(session) {
     if (capture?.recorder?.state === 'recording') {
-      capture.recorder.stop();
+      submitCapture(capture);
       return;
     }
     if (capture || pending.has(dialogId)) return;
-    const inform = message => session ? voiceState('ready', message) : toast(message);
+    const inform = message => activeVoice(session) && voiceState('ready', message);
     if (!API_ENDPOINT) return inform('Сервер LUMI недоступен.');
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       return inform('Запись с микрофона недоступна в этом браузере.');
     }
-    const turn = {controller: new AbortController(), session};
+    const turn = {controller: new AbortController(), session, model: selectedModel};
     capture = turn;
-    if (session) {
-      resetPlayback();
-      voiceState('waiting', 'Запрашиваю доступ к микрофону…');
-    }
+    resetPlayback();
+    voiceState('waiting', 'Запрашиваю доступ к микрофону…');
     try {
       turn.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1}});
       if (capture !== turn) { turn.stream.getTracks().forEach(track => track.stop()); return; }
       const formats = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
       const mimeType = formats.find(type => MediaRecorder.isTypeSupported(type));
-      const recorder = turn.recorder = new MediaRecorder(turn.stream, mimeType ? {mimeType} : undefined);
+      const recorder = turn.recorder = new MediaRecorder(turn.stream, {
+        ...(mimeType && {mimeType}), audioBitsPerSecond: 48000,
+      });
       const chunks = [];
       recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
       recorder.onstop = () => finishCapture(turn, chunks);
@@ -665,12 +693,8 @@
         inform('Ошибка записи. Попробуй ещё раз.');
       };
       recorder.start();
-      turn.timer = setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 25000);
-      if (session) voiceState('listening', 'Слушаю. Нажми «Готово», когда закончишь.');
-      else {
-        dictation.setAttribute('aria-label', 'Остановить запись');
-        setIcon(dictation, 'spark');
-      }
+      turn.timer = setTimeout(() => { if (recorder.state === 'recording') submitCapture(turn); }, 25000);
+      voiceState('listening', 'Слушаю. Нажми «Готово», когда закончишь.');
     } catch (error) {
       if (capture !== turn) return;
       releaseCapture(turn);
@@ -678,14 +702,18 @@
     }
   }
 
-  $('#composer-more').addEventListener('click', () => {
+  microphone.addEventListener('click', () => {
+    if (capture || pending.has(dialogId)) return toast('Дождись текущего ответа.');
+    input.blur();
     voiceSession = new AbortController();
     voiceState('ready', 'Нажми «Говорить» и задай вопрос.');
     voicePanel.showModal();
     tg?.BackButton?.show();
+    toggleRecording(voiceSession);
   });
   voicePanel.addEventListener('close', () => {
-    if (capture?.session && capture.session === voiceSession) {
+    if (voicePanel.open) return;
+    if (capture && capture.session === voiceSession && !capture.committed) {
       const turn = capture;
       turn.controller.abort();
       releaseCapture(turn);
@@ -699,7 +727,6 @@
   $('#voice-close').addEventListener('click', () => voicePanel.close());
   $('#voice-read').addEventListener('click', () => voicePanel.close());
   voiceStart.addEventListener('click', () => toggleRecording(voiceSession));
-  dictation.addEventListener('click', () => toggleRecording());
   function renderTasks(){const tasks=storage.read('tasks');const list=$('#tasks-list');list.innerHTML='';$('#day-count').textContent=tasks.length?`Выполнено: ${tasks.filter(t=>t.done).length} из ${tasks.length}`:'Нет дел';if(!tasks.length){list.innerHTML='<div class="empty">Планов пока нет. Добавь то, о чём хочется помнить.</div>';return;}tasks.forEach(t=>{const row=document.createElement('div');row.className='entry task-entry'+(t.done?' done':'');row.innerHTML=`<button class="check" aria-label="Отметить план">${t.done?'✓':''}</button><span></span><button class="remove" aria-label="Удалить">×</button>`;row.querySelector('span').textContent=t.text;row.querySelector('.check').onclick=()=>{t.done=!t.done;storage.write('tasks',tasks);renderTasks()};row.querySelector('.remove').onclick=()=>{storage.write('tasks',tasks.filter(x=>x.id!==t.id));renderTasks()};list.append(row);});}
   $('#task-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#task-input'),text=input.value.trim();if(!text)return;const tasks=storage.read('tasks');tasks.unshift({id:Date.now(),text,done:false});storage.write('tasks',tasks);input.value='';renderTasks()});renderTasks();
   function renderNotes(){const notes=storage.read('notes');const list=$('#notes-list');list.innerHTML='';if(!notes.length){list.innerHTML='<div class="empty">Здесь появятся сохранённые заметки.</div>';return;}notes.forEach(n=>{const row=document.createElement('div');row.className='entry';row.innerHTML='<span></span><button aria-label="Удалить заметку">×</button>';row.querySelector('span').textContent=n.text;const small=document.createElement('small');small.textContent=new Date(n.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});row.querySelector('span').append(small);row.querySelector('button').onclick=()=>{storage.write('notes',notes.filter(x=>x.id!==n.id));renderNotes()};list.append(row);});}
@@ -874,6 +901,45 @@
     } catch {list.textContent='Не удалось обновить ленту. Открой раздел чуть позже.';}
     finally {loadingNews=false;}
   }
+  const shortcutButtons = $$('[data-home-shortcut]');
+  const shortcutSupported = tg?.initData && tg?.isVersionAtLeast?.('8.0') && typeof tg.addToHomeScreen === 'function';
+  let shortcutStatus = shortcutSupported ? 'unknown' : 'unsupported';
+
+  function updateShortcut(status) {
+    shortcutStatus = status;
+    shortcutButtons.forEach(button => {
+      const label = button.querySelector('[data-shortcut-label]');
+      if (status === 'added') label.textContent = 'Ярлык добавлен';
+      else label.textContent = button.classList.contains('home-install') ? 'На главный экран' : 'Добавить на главный экран';
+    });
+  }
+
+  shortcutButtons.forEach(button => button.addEventListener('click', () => {
+    if (shortcutStatus === 'added') return toast('LUMI уже есть на домашнем экране.');
+    if (shortcutStatus === 'unsupported') return toast('Ярлык доступен в поддерживаемых мобильных версиях Telegram.');
+    try { tg.addToHomeScreen(); } catch { toast('Telegram не смог добавить ярлык на этом устройстве.'); }
+  }));
+
+  if (shortcutSupported) {
+    tg.onEvent?.('homeScreenAdded', () => updateShortcut('added'));
+    try { tg.checkHomeScreenStatus?.(updateShortcut); } catch {}
+  }
+
+  function updateFullscreen() {
+    document.documentElement.classList.toggle('telegram-fullscreen', tg?.isFullscreen === true);
+    fitViewport();
+  }
+
+  if (tg?.initData && tg?.isVersionAtLeast?.('8.0')) {
+    tg.onEvent?.('fullscreenChanged', updateFullscreen);
+    tg.onEvent?.('safeAreaChanged', updateFullscreen);
+    tg.onEvent?.('contentSafeAreaChanged', updateFullscreen);
+    updateFullscreen();
+    if (!tg.isFullscreen) {
+      try { tg.requestFullscreen?.(); } catch {}
+    }
+  }
+
   tg?.BackButton?.onClick(() => {
     if (voicePanel.open) voicePanel.close();
     else if (modelPicker.open) modelPicker.close();

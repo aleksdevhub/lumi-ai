@@ -1,5 +1,5 @@
 import {lookup} from './live.js';
-import {answer} from './assistant.js';
+import {answer, answerAudio} from './assistant.js';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
 export {PcRelay};
@@ -64,7 +64,9 @@ export default {
       const items=await lookup('news','');
       return response({items},items.length?200:503,allowed);
     }
-    if (request.method === "GET" && url.pathname === "/health") return response({ ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"] }, 200, allowed);
+    if (request.method === "GET" && url.pathname === "/health") return response({
+      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true,
+    }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
         return response({error:'Unauthorized'},401);
@@ -156,7 +158,7 @@ export default {
         if (encoder.encode(raw).byteLength > 1000000) return response({ error: "Запись слишком длинная. Попробуй ещё раз короче." }, 413, allowed);
         body = JSON.parse(raw);
       } catch { return response({ error: "Не удалось прочитать запись." }, 400, allowed); }
-      const user = await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN);
+      const user = typeof body?.initData === 'string' ? await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN) : null;
       if (!user?.id) return response({ error: "Открой LUMI через Telegram и разреши доступ к микрофону." }, 401, allowed);
       const now = Date.now();
       const key = String(user.id);
@@ -170,6 +172,20 @@ export default {
         return response({ error: "Не получилось обработать запись. Попробуй записать ещё раз." }, 400, allowed);
       }
       const geminiMimeType = mimeType === "audio/mp4" ? "audio/m4a" : mimeType;
+      if (body.conversation === true) {
+        const history = Array.isArray(body.history) ? body.history.slice(-8)
+          .filter(item => ['user', 'assistant'].includes(item?.role) && typeof item.text === 'string' && item.text.trim())
+          .map(item => ({role: item.role === 'assistant' ? 'model' : 'user', parts: [{text: item.text.slice(0, 1200)}]})) : [];
+        const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0, 500) : '';
+        try {
+          const turn = await answerAudio(env, history, audio, geminiMimeType, preferences, body.model);
+          if (!turn.transcript) return response({error: 'Речь не распознана. Попробуй ещё раз.'}, 422, allowed);
+          return response(turn, 200, allowed);
+        } catch (error) {
+          const limited = error.status === 429;
+          return response({error: limited ? 'Достигнут лимит модели. Попробуй позже.' : 'Не удалось обработать голосовой вопрос. Попробуй ещё раз.'}, limited ? 429 : 502, allowed);
+        }
+      }
       const model = /^[a-zA-Z0-9._-]+$/.test(env.GEMINI_MODEL || "") ? env.GEMINI_MODEL : "gemini-3.5-flash-lite";
       try {
         const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -250,7 +266,7 @@ export default {
     if (photoRequest) contents.at(-1).parts.push({ inlineData: { mimeType: "image/jpeg", data: body.photo } });
     try {
       const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0,500) : '';
-      return response(await answer(env,contents,preferences,body.memory),200,allowed);
+      return response(await answer(env,contents,preferences,body.memory,body.model),200,allowed);
     } catch (error) {
       return response({error:error.status===429?'Достигнут лимит модели. Попробуй позже.':'Не удалось получить ответ от модели. Попробуй позже.'},error.status===429?429:502,allowed);
     }

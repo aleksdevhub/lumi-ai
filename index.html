@@ -4,15 +4,15 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#101010"><meta name="description" content="LUMI — личный AI-ассистент в Telegram">
   <title>LUMI — личный ассистент</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js?65"></script>
   <script>try { if (localStorage.getItem('lumi:theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
-  <link rel="stylesheet" href="style.css?v=voice-lumi-1">
+  <link rel="stylesheet" href="style.css?v=flash-lumi-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar" hidden>
     <button id="open-menu" class="icon-button" aria-label="Открыть меню" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
-    <button type="button" class="model-trigger" id="open-model" data-model aria-haspopup="dialog" aria-controls="model-picker" aria-label="Выбрать модель: Lumi 1.0">
-      Lumi <span>1.0</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+    <button type="button" class="model-trigger" id="open-model" data-model aria-haspopup="dialog" aria-controls="model-picker" aria-label="Выбрать модель">
+      <span data-model-label>Lumi 1.1 Flash</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
     </button>
     <button type="button" class="icon-button" data-new-chat aria-label="Новый чат" title="Новый чат">＋</button>
   </header>
@@ -25,7 +25,10 @@
             </div>
         <h1 id="home-title">Привет, я Lumi</h1>
         <p>Фонарик — мой маскот. Я помогу разобраться в вопросе, написать текст, разобрать фото или составить план.</p>
-        <button type="button" class="home-chat" data-open="chat"><span data-icon="chat"></span>Начать чат</button>
+        <div class="home-actions">
+          <button type="button" class="home-chat" data-open="chat"><span data-icon="chat"></span>Начать чат</button>
+          <button type="button" class="home-install" data-home-shortcut><span data-icon="shortcut"></span><span data-shortcut-label>На главный экран</span></button>
+        </div>
       </div>
       <h2 class="group-title">Что я умею</h2>
       <div class="group-card">
@@ -65,8 +68,7 @@
           <button type="button" class="icon-button" id="attach-photo" aria-label="Прикрепить фото" title="Прикрепить фото">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.4"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg>
           </button>
-          <button type="button" id="composer-more" aria-haspopup="dialog" aria-controls="voice-panel"><span class="wave" aria-hidden="true"><i></i><i></i><i></i></span>Голос</button>
-          <button type="button" class="voice icon-button" id="voice" aria-label="Продиктовать текст"></button>
+          <button type="button" class="voice icon-button" id="voice" aria-label="Открыть голосовой чат" title="Голосовой чат" aria-haspopup="dialog" aria-controls="voice-panel"></button>
           <button class="send icon-button" aria-label="Отправить сообщение"></button>
         </div>
       </form>
@@ -101,12 +103,15 @@
       <div class="view-head"><h2>Настройки</h2></div>
       <div class="panel-stack">
         <div class="group-card settings-appearance">
+          <button type="button" class="group-row" data-home-shortcut>
+            <span class="row-icon" data-icon="shortcut"></span><span class="row-label" data-shortcut-label>Добавить на главный экран</span><span class="row-chevron" aria-hidden="true">›</span>
+          </button>
           <label class="group-row">
             <span class="row-icon" data-icon="sun"></span><span class="row-label">Тема</span>
             <select id="theme-select" aria-label="Тема оформления"><option value="dark">Тёмная</option><option value="light">Светлая</option></select>
           </label>
           <button type="button" class="group-row" data-model aria-haspopup="dialog" aria-controls="model-picker">
-            <span class="row-icon" data-icon="spark"></span><span class="row-label">Модель</span><span class="row-value">Lumi 1.0</span><span class="row-chevron" aria-hidden="true">›</span>
+            <span class="row-icon" data-icon="spark"></span><span class="row-label">Модель</span><span class="row-value" data-model-label>Lumi 1.1 Flash</span><span class="row-chevron" aria-hidden="true">›</span>
           </button>
         </div>
         <details class="panel" id="reply-settings"><summary>Ответы и память</summary>
@@ -182,7 +187,11 @@
       <h2 id="model-title">Модель для чата</h2>
       <label class="model-option">
         <span><strong>Lumi 1.0</strong><small>Текст, фото и голос · на базе Gemini</small></span>
-        <input type="radio" name="model" value="lumi-1" checked>
+        <input type="radio" name="model" value="lumi-1">
+      </label>
+      <label class="model-option">
+        <span><strong>Lumi 1.1 Flash</strong><small>Gemini 3.8 Flash · быстрый режим</small></span>
+        <input type="radio" name="model" value="lumi-flash" checked>
       </label>
       <button class="model-done" value="done" autofocus>Готово</button>
     </form>
@@ -192,4 +201,4 @@
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=voice-lumi-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=flash-lumi-1"></script></body></html>
