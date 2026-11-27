@@ -163,31 +163,37 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
   padding-bottom: max(12px, env(safe-area-inset-bottom)); gap: 8px;
 }
 #chat-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-#welcome { min-height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 24px clamp(4px, 2vw, 24px); }
-.fold { display: flex; gap: 3px; align-items: center; height: 38px; margin: 0 0 18px 4px; transform: skew(-18deg); }
-.fold i { width: 8px; height: 22px; background: #e4e3df; }
-.fold i:nth-child(2) { height: 36px; }
-.fold i:last-child { height: 28px; }
-#welcome h1 { margin: 0; font: 500 clamp(43px, 8vw, 68px)/1.01 system-ui,sans-serif; letter-spacing: -.065em; }
-#welcome h1 em { font: italic 1.13em/1.03 Georgia,serif; color: #bfbfba; }
-.suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
-.suggestions button { display: flex; align-items: center; gap: 7px; color: #ddd; background: none; border: 1px solid #383838; border-radius: 12px; font-size: 14px; min-height: 44px; padding: 8px 12px; }
-.suggestions svg { width: 17px; height: 17px; }
+#welcome { min-height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px 0 30px; text-align: center; }
+.fold { display: flex; align-items: center; justify-content: center; gap: 3px; width: 60px; height: 60px; margin-bottom: 20px; border: 1px solid #404040; border-radius: 19px; background: linear-gradient(145deg, #303030, #1c1c1c); }
+.fold i { width: 5px; height: 16px; background: #efefed; border-radius: 4px; transform: skew(-17deg); }
+.fold i:nth-child(2) { height: 29px; }
+.fold i:last-child { height: 22px; }
+#welcome h1 { margin: 0; font: 620 clamp(28px, 6vw, 48px)/1.12 system-ui,sans-serif; letter-spacing: -.055em; }
+.suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: min(100%, 440px); margin-top: 24px; }
+.suggestions button {
+  display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 8px 10px;
+  color: var(--text); text-align: left; background: #1c1c1c; border: 1px solid #363636;
+  border-radius: 17px; font-size: 14px; line-height: 1.2;
+}
+.suggestions button:hover { background: #292929; }
+.suggestions [data-icon] { display: grid; flex: none; place-items: center; width: 26px; height: 26px; border-radius: 9px; background: #313131; color: #ddd; }
+.suggestions svg { width: 15px; height: 15px; }
 .messages { display: grid; justify-items: start; gap: 22px; padding: 20px 2px; }
 .messages:empty { display: none; }
 .message { max-width: 100%; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; line-height: 1.56; }
 .message.user { justify-self: end; max-width: 85%; background: #303030; border-radius: 19px 19px 5px 19px; padding: 10px 15px; }
 .message.system::before { content: 'Lumi'; display: block; color: #aaa; font: 600 15px/1.5 Georgia,serif; margin-bottom: 5px; }
-.composer { flex: none; padding: 13px 10px 8px; background: #242424; border: 1px solid #444; border-radius: 23px; }
+.composer { flex: none; padding: 9px 7px 6px; background: #202020; border: 1px solid #383838; border-radius: 24px; }
 .composer:focus-within { border-color: #777; }
-.composer textarea { display: block; width: 100%; min-height: 30px; max-height: 120px; padding: 2px 6px; margin: 0 0 5px; border: 0; outline: none; resize: none; background: transparent; color: #fff; font: 16px/1.5 system-ui,sans-serif; }
+.composer textarea { display: block; width: 100%; min-height: 30px; max-height: 120px; padding: 3px 9px; margin: 0 0 2px; border: 0; outline: none; resize: none; background: transparent; color: #fff; font: 16px/1.5 system-ui,sans-serif; }
 .composer-actions { display: flex; align-items: center; gap: 4px; }
-.composer-actions #composer-more { margin-right: auto; border-radius: 14px; gap: 8px; padding: 0 10px; font-size: 14px; color: #ccc; }
+.composer-actions #composer-more { margin-right: auto; border-radius: 16px; gap: 6px; padding: 0 10px; font-size: 14px; color: #ccc; }
 .wave { display: inline-flex; gap: 2px; align-items: center; }
 .wave i { width: 2px; height: 8px; background: currentColor; border-radius: 2px; }
 .wave i:nth-child(2) { height: 16px; }
 .wave i:last-child { height: 12px; }
-.composer-actions .send { background: #efefed; color: #151515; }
+.composer-actions button:hover { background: #323232; }
+.composer-actions .send, .composer-actions .send:hover { background: #efefed; color: #151515; }
 .composer-actions .send:disabled { opacity: .5; }
 .voice-panel:not([open]) { display: none; }
 .voice-panel[open] { overflow-y: auto; max-height: 38%; margin: 0; }
@@ -203,7 +209,7 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 .service { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 12px; min-height: 55px; border: 0; border-bottom: 1px solid #303030; border-radius: 0; padding: 10px 3px; }
 .service-icon,.service small { margin: 0; }
 .entry .check { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid #666; }
-@media (max-height: 520px) { #welcome { padding-block: 10px; } .fold { display: none; } #welcome h1 { font-size: 31px; } .suggestions { margin-top: 10px; } }
+@media (max-height: 520px) { #welcome { padding-block: 10px; } .fold { display: none; } #welcome h1 { font-size: 28px; } .suggestions { margin-top: 10px; } }
 @media (prefers-reduced-motion: reduce) { *, html { animation: none !important; scroll-behavior: auto !important; } }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -239,24 +245,9 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 #reply-prefs { width:100%; padding:10px; font:16px/1.5 inherit; font-size:16px; }
 .sources { margin-top:12px; padding-top:9px; border-top:1px solid #444; color:#aaa; font-size:13px; white-space:normal; }
 .sources a { display:block; padding:4px 0; color:#ddd; overflow-wrap:anywhere; }
-
-/* Lumi's violet palette keeps the conversation and controls in their familiar positions. */
-:root { --bg:#17141e; --surface:#282331; --line:#40364e; --text:#f7f2ff; }
-.topbar { background:var(--bg); border-bottom-color:#ffffff12; }
-.wordmark,.menu-head strong { font:650 24px/1 system-ui,sans-serif; letter-spacing:-.06em; }
-#chat-scroll:has(#welcome:not([hidden])) { background:radial-gradient(ellipse at 18% 44%,#a979ff12,transparent 58%); }
-.fold { transform:skew(-16deg); gap:4px; }
-.fold i { width:9px; border-radius:8px; background:#b198ff; }
-.fold i:nth-child(2) { background:#e2c6ff; }
-.fold i:nth-child(3) { background:#8e71ed; }
-#welcome h1 { font-weight:600; }
-#welcome h1 em { font:inherit; color:#d5b9ff; }
-.suggestions button { background:#282230; border-color:#45394f; border-radius:17px; }
-.suggestions svg,.sources a { color:#d3b6ff; }
-.composer { background:#2b2533; border-color:#51435e; }
-.composer:focus-within { border-color:#b097d3; }
-.composer-actions .send { background:#d2b4ff; color:#261637; }
-.message.user { background:#382c46; }
-.message.system::before { color:#d5bbf3; font-family:inherit; }
-#menu,.voice-panel[open] { background:#211c29; }
-.tab.active,.dialog-link[aria-current="true"] { background:#3a2f46; }
+.topbar [data-new-chat] { font-size: 25px; }
+.recent-heading button {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; min-height: 44px; padding: 0; color: inherit;
+  background: none; border: 0; font: inherit; text-align: left;
+}

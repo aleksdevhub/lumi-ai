@@ -5,13 +5,13 @@
   <meta name="theme-color" content="#101010"><meta name="description" content="LUMI — личный AI-ассистент в Telegram">
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=amethyst-1">
+  <link rel="stylesheet" href="style.css?v=graphite-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar">
     <button id="open-menu" class="icon-button" aria-label="Открыть меню" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
     <button class="wordmark" data-open="chat">Lumi</button>
-    <button class="icon-button" data-open="history" aria-label="История сообщений" data-icon="history"></button>
+    <button type="button" class="icon-button" data-new-chat aria-label="Новый чат" title="Новый чат">＋</button>
   </header>
   <main>
     <section class="view" id="home">
@@ -28,11 +28,12 @@
       <div id="chat-scroll">
         <div id="welcome">
           <div class="fold" aria-hidden="true"><i></i><i></i><i></i></div>
-          <h1>Что у тебя<br><em>на уме?</em></h1>
+          <h1>Чем тебе помочь?</h1>
           <div class="suggestions">
             <button data-prompt="Помоги составить план на день. "><span data-icon="calendar"></span>Составить план</button>
             <button data-prompt="Помоги отредактировать текст. "><span data-icon="note"></span>Улучшить текст</button>
             <button data-prompt="Покажи свежие новости"><span data-icon="news"></span>Свежие новости</button>
+            <button data-open="weather"><span data-icon="sun"></span>Узнать погоду</button>
           </div>
         </div>
         <div class="messages" id="messages" aria-live="polite"></div>
@@ -43,12 +44,12 @@
           <img alt="Выбранное фото"><small>При отправке фото получит Gemini</small>
           <button type="button" class="icon-button" id="remove-photo" aria-label="Убрать фото">×</button>
         </div>
-        <textarea id="chat-input" rows="1" placeholder="Написать Lumi…" aria-label="Сообщение"></textarea>
+        <textarea id="chat-input" rows="1" placeholder="Спроси у Lumi" aria-label="Сообщение"></textarea>
         <div class="composer-actions">
-          <button type="button" id="composer-more" aria-expanded="false" aria-controls="voice-panel"><span class="wave" aria-hidden="true"><i></i><i></i><i></i></span>Голос</button>
           <button type="button" class="icon-button" id="attach-photo" aria-label="Прикрепить фото" title="Прикрепить фото">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.4"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg>
           </button>
+          <button type="button" id="composer-more" aria-expanded="false" aria-controls="voice-panel"><span class="wave" aria-hidden="true"><i></i><i></i><i></i></span>Голос</button>
           <button type="button" class="voice icon-button" id="voice" aria-label="Продиктовать текст"></button>
           <button class="send icon-button" aria-label="Отправить сообщение"></button>
         </div>
@@ -81,6 +82,6 @@
       <button class="tab" data-tab="services"><span data-icon="grid"></span>Инструменты</button>
       <button class="tab" data-tab="profile"><span data-icon="user"></span>Профиль</button>
     </nav>
-    <h3 class="recent-heading">Недавние чаты</h3><div id="recent-chats"></div>
+    <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=news-2"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=graphite-1"></script></body></html>

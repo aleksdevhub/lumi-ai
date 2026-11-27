@@ -177,7 +177,7 @@
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
   }
   input.addEventListener('input', resizeInput);
-  $$('.suggestions button').forEach(button => button.addEventListener('click', () => {
+  $$('.suggestions [data-prompt]').forEach(button => button.addEventListener('click', () => {
     input.value = button.dataset.prompt;
     input.focus();
     resizeInput();
