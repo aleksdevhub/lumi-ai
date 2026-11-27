@@ -417,6 +417,21 @@ button.group-row:hover, button.all-tools:hover { background: var(--control); }
 @keyframes voice-listening { from { box-shadow: 0 0 0 0 #a0a0a030; } to { box-shadow: 0 0 0 9px #a0a0a008; } }
 @keyframes voice-mouth { from { transform: scaleY(.55); } to { transform: scaleY(1.6); } }
 
+.chat-forecast {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr));
+  gap: 7px; width: min(100%, 560px); margin-top: 10px; white-space: normal;
+}
+.forecast-tile {
+  display: grid; align-content: start; gap: 3px; min-width: 0; padding: 9px 10px;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--card);
+  color: var(--ink); line-height: 1.25; font-size: 13px;
+}
+.forecast-tile strong { font-size: 18px; }
+.forecast-tile small { color: var(--quiet); font-size: 11px; }
+.system:has(.chat-forecast) { width: 100%; }
+.generated-photo { margin-top: 8px; max-width: min(100%, 420px); max-height: min(420px, 60dvh); }
+.image-download { display: inline-block; padding: 7px 0; color: var(--ink); font-size: 14px; }
+
 .home-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .home-install {
   display: inline-flex; align-items: center; gap: 7px; min-height: 44px;

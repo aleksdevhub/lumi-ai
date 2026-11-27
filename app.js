@@ -1,3 +1,4 @@
+import {weatherRequest, imageRequest} from './intents.mjs?v=lumi-live-1';
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
@@ -306,6 +307,94 @@
     }
     row.append(block);
   }
+
+  const forecastMarker = '\n\nПрогноз LUMI · ';
+  function replyDetails(text) {
+    const details = separateSources(text);
+    const marker = details.body.lastIndexOf(forecastMarker);
+    if (marker < 0) return details;
+    try {
+      const cards = JSON.parse(details.body.slice(marker + forecastMarker.length));
+      if (Array.isArray(cards) && cards.length <= 7) return {...details, body: details.body.slice(0, marker), cards};
+    } catch {}
+    return details;
+  }
+
+  const conditions = [
+    [0, '☀', 'Ясно'], [2, '⛅', 'Переменная облачность'], [3, '☁', 'Облачно'],
+    [48, '≋', 'Туман'], [57, '☂', 'Морось'], [67, '☂', 'Дождь'],
+    [77, '❄', 'Снег'], [82, '☂', 'Ливень'], [86, '❄', 'Снегопад'], [99, 'ϟ', 'Гроза'],
+  ];
+  function appendForecast(row, cards) {
+    if (!cards?.length) return;
+    const grid = document.createElement('div');
+    grid.className = 'chat-forecast';
+    for (const card of cards) {
+      if (!card || typeof card.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(card.date)) continue;
+      const [, symbol, label] = conditions.find(([limit]) => Number.isFinite(card.code) && card.code <= limit) || [0, '—', ''];
+      const tile = document.createElement('article');
+      tile.className = 'forecast-tile';
+      const day = document.createElement('small');
+      day.textContent = new Date(card.date + 'T12:00:00Z').toLocaleDateString('ru-RU', {weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC'});
+      const temp = document.createElement('strong');
+      const degrees = value => Number.isFinite(value) ? value + '°' : '—';
+      const range = degrees(card.min) + ' / ' + degrees(card.max);
+      temp.textContent = symbol + ' ' + (Number.isFinite(card.temperature) ? degrees(card.temperature) : range);
+      const info = document.createElement('span');
+      info.textContent = label;
+      const extra = document.createElement('small');
+      extra.textContent = [
+        ...(Number.isFinite(card.temperature) ? [range] : []),
+        ...(Number.isFinite(card.feels) ? ['Ощущается ' + degrees(card.feels)] : []),
+        ...(Number.isFinite(card.rain) ? ['Осадки ' + card.rain + '%'] : []),
+      ].join(' · ');
+      tile.append(day, temp, info, extra);
+      grid.append(tile);
+    }
+    row.append(grid);
+  }
+
+  let recentPosition;
+  async function getWeatherPosition() {
+    if (recentPosition && Date.now() - recentPosition.time < 300000) return recentPosition.coords;
+    const manager = tg?.LocationManager;
+    const coords = await new Promise(resolve => {
+      let timer;
+      function finish(result) {
+        clearTimeout(timer);
+        if (!result || !Number.isFinite(result.latitude) || !Number.isFinite(result.longitude)) return resolve(null);
+        resolve({latitude: Number(result.latitude.toFixed(2)), longitude: Number(result.longitude.toFixed(2))});
+      }
+      function browserLocation() {
+        if (!navigator.geolocation) return finish(null);
+        navigator.geolocation.getCurrentPosition(position => finish(position.coords), () => finish(null), {timeout: 7000, maximumAge: 300000});
+      }
+      timer = setTimeout(() => finish(null), 12000);
+      if (!tg?.initData || !tg.isVersionAtLeast?.('8.0') || !manager) return browserLocation();
+      try {
+        const get = () => {
+          if (!manager.isLocationAvailable) return browserLocation();
+          try { manager.getLocation(finish); } catch { browserLocation(); }
+        };
+        if (manager.isInited) get();
+        else manager.init(get);
+      } catch { browserLocation(); }
+    });
+    if (coords) recentPosition = {coords, time: Date.now()};
+    return coords;
+  }
+
+  async function generatedThumbnail(base64) {
+    if (typeof base64 !== 'string' || !base64.startsWith('/9j/') || base64.length > 5000000) throw Error('Сервер вернул неподдерживаемое изображение.');
+    const image = new Image();
+    image.src = 'data:image/jpeg;base64,' + base64;
+    await image.decode();
+    let scaled = jpeg(image, 620, 0.8);
+    if (scaled.length > 99000) scaled = jpeg(image, 480, 0.63);
+    if (scaled.length > 99000) scaled = jpeg(image, 360, 0.55);
+    if (scaled.length > 99000) throw Error('Изображение слишком большое для истории.');
+    return scaled;
+  }
   const memoryKey='webNotes:'+(tg?.initDataUnsafe?.user?.id || 'guest');
   const enabledKey=memoryKey+':enabled';
   const memoryEnabled=$('#web-memory');
@@ -343,15 +432,24 @@
     for (const item of list.slice(-30)) {
       const row = document.createElement('div');
       row.className = 'message ' + (item.role === 'assistant' ? 'system' : 'user');
-      const details=item.role==='assistant'?separateSources(item.text):{body:item.text};
+      const details=item.role==='assistant'?replyDetails(item.text):{body:item.text};
       row.textContent = details.body;
+      appendForecast(row, details.cards);
       attachSources(row,details);
       if (item.thumb?.startsWith('data:image/jpeg;base64,')) {
         const image = new Image();
         image.className = 'chat-photo';
-        image.alt = 'Прикреплённое фото';
+        image.alt = item.role === 'assistant' ? 'Изображение, созданное LUMI' : 'Прикреплённое фото';
         image.src = item.thumb;
-        row.prepend(image);
+        if (item.role === 'assistant') {
+          image.classList.add('generated-photo');
+          const download = document.createElement('a');
+          download.className = 'image-download';
+          download.href = item.thumb;
+          download.download = 'lumi-' + item.id + '.jpg';
+          download.textContent = 'Скачать изображение';
+          row.append(image, download);
+        } else row.prepend(image);
       }
       box.append(row);
     }
@@ -367,7 +465,7 @@
     const scroll = $('#chat-scroll');
     const details=separateSources(reply);
     const letters = Array.from(details.body);
-    const duration = Math.min(4800, letters.length * 22);
+    const duration = Math.min(400, letters.length * 5);
     const start = performance.now();
     const text = document.createTextNode('');
     row.replaceChildren(text);
@@ -390,7 +488,7 @@
 
   function modelHistory(messages, count) {
     return messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-count).map(m => ({
-      role: m.role, text: (m.role === 'assistant' ? separateSources(m.text).body.slice(0, 4000) : m.text) || (m.thumb ? 'Фото' : ''),
+      role: m.role, text: (m.role === 'assistant' ? replyDetails(m.text).body.slice(0, 4000) : m.text) || (m.thumb ? 'Фото' : ''),
     }));
   }
 
@@ -426,9 +524,19 @@
           initData: tg?.initData || '',
           preferences: storage.read('replyPrefs', ''),
           model: selectedModel,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           memory: relatedNotes(text),
           messages: modelHistory(messages, 16),
         };
+        const weather = !photo && weatherRequest(text);
+        if (weather && !weather.city) {
+          row.textContent = 'Определяю местоположение…';
+          payload.coords = await getWeatherPosition();
+          if (!payload.coords) payload.weatherCity = storage.read('profile', {}).city || '';
+          row.textContent = 'Получаю прогноз…';
+        } else if (!photo && imageRequest(text)?.prompt) {
+          row.textContent = 'Создаю изображение…';
+        }
         while (payload.messages.length > 1 && new TextEncoder().encode(JSON.stringify(payload)).length > 23500) {
           payload.messages.shift();
         }
@@ -453,14 +561,16 @@
         } catch {toast('Не удалось сохранить страницу на устройстве');}
       }
       let savedReply=data.reply;
+      if (Array.isArray(data.weather?.cards)) savedReply += forecastMarker + JSON.stringify(data.weather.cards);
+      const thumb = data.image ? await generatedThumbnail(data.image) : null;
       if(data.sources?.length && data.checkedAt) {
         savedReply+=sourceMarker+data.checkedAt+'\n'+data.sources.map(s=>s.title.replace(/\s+/g,' ')+'\n'+s.url).join('\n');
       }
-      historyNow.push({id: uid(), role: 'assistant', text: savedReply, at: Date.now()});
+      historyNow.push({id: uid(), role: 'assistant', text: savedReply, at: Date.now(), ...(thumb && {thumb})});
       saveDialog(target, historyNow);
       scheduleSync();
       if (dialogId !== target) return;
-      if (row.isConnected && !session) revealReply(row, savedReply);
+      if (row.isConnected && !session && !data.sources?.length && !data.weather && !thumb) revealReply(row, savedReply);
       else { pending.delete(target); renderChat(); }
       if (activeVoice(session)) speak(data.reply, session);
     } catch (error) {
@@ -488,6 +598,8 @@
   let capture = null;
   let voiceSession = null;
   let audioUrl = '';
+  let voiceBuffer = null;
+  let activeSound = null;
   let spokenText = '';
   let deviceSpeech = false;
   let speechHint = '';
@@ -500,17 +612,18 @@
   function voiceState(state, message) {
     voicePanel.dataset.state = state;
     voiceStatus.textContent = message;
-    voiceStart.textContent = state === 'listening' ? 'Готово' : 'Говорить';
-    voiceStart.disabled = state === 'waiting';
+    voiceStart.hidden = state === 'listening' || state === 'waiting';
     voicePlay.textContent = state === 'speaking' ? 'Остановить' : 'Воспроизвести';
   }
 
   function resetPlayback() {
+    stopBufferedPlayback();
     audio.pause();
     audio.removeAttribute('src');
     window.speechSynthesis?.cancel();
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     audioUrl = '';
+    voiceBuffer = null;
     spokenText = '';
     speechHint = '';
     voicePlay.hidden = true;
@@ -520,18 +633,32 @@
     return !!session && session === voiceSession && voicePanel.open;
   }
 
-  function finishPlayback() {
-    if (voicePanel.open && voicePanel.dataset.state === 'speaking') {
+  function finishPlayback(resume = false) {
+    const session = voiceSession;
+    if (activeVoice(session) && voicePanel.dataset.state === 'speaking') {
       voiceState('ready', speechHint || 'Ответ сохранён в чате.');
+      if (resume) setTimeout(() => {
+        if (activeVoice(session) && voicePanel.dataset.state === 'ready') toggleRecording(session);
+      }, 450);
     }
   }
 
-  audio.addEventListener('ended', finishPlayback);
+  audio.addEventListener('ended', () => finishPlayback(true));
+
+  function stopBufferedPlayback() {
+    if (!activeSound) return;
+    const source = activeSound;
+    activeSound = null;
+    source.onended = null;
+    source.stop();
+    source.disconnect();
+  }
 
   async function playReply() {
     const session = voiceSession;
     if (!activeVoice(session) || !spokenText) return;
     if (voicePanel.dataset.state === 'speaking') {
+      stopBufferedPlayback();
       audio.pause();
       window.speechSynthesis?.cancel();
       finishPlayback();
@@ -546,13 +673,26 @@
         const voices = speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith(locale));
         utterance.voice = voices.find(v => /enhanced|premium|natural|улучш/i.test(v.name)) || voices[0] || null;
         utterance.onstart = () => { if (activeVoice(session)) voiceState('speaking', 'Фонарик говорит…'); };
-        utterance.onend = () => { if (activeVoice(session)) finishPlayback(); };
+        utterance.onend = () => { if (activeVoice(session)) finishPlayback(true); };
         utterance.onerror = ({error}) => {
           if (activeVoice(session) && !['interrupted', 'canceled'].includes(error)) {
             voiceState('ready', 'Не удалось воспроизвести голос. Ответ есть в чате.');
           }
         };
         speechSynthesis.speak(utterance);
+      } else if (voiceBuffer && session.audioContext?.state === 'running') {
+        const source = session.audioContext.createBufferSource();
+        source.buffer = voiceBuffer;
+        source.connect(session.audioContext.destination);
+        source.onended = () => {
+          if (activeSound !== source) return;
+          activeSound = null;
+          source.disconnect();
+          finishPlayback(true);
+        };
+        source.start();
+        activeSound = source;
+        voiceState('speaking', 'Фонарик говорит…');
       } else {
         audio.currentTime = 0;
         await audio.play();
@@ -590,6 +730,11 @@
         if (!activeVoice(session)) return;
         audioUrl = URL.createObjectURL(sound);
         audio.src = audioUrl;
+        if (session.audioContext?.state === 'running' && typeof session.audioContext.decodeAudioData === 'function') {
+          const buffer = await session.audioContext.decodeAudioData(await sound.arrayBuffer()).catch(() => null);
+          if (!activeVoice(session)) return;
+          voiceBuffer = buffer;
+        }
       } catch {
         if (!activeVoice(session)) return;
         deviceSpeech = true;
@@ -604,6 +749,7 @@
   function releaseCapture(turn) {
     if (capture !== turn) return;
     clearTimeout(turn.timer);
+    stopSpeechDetection(turn);
     turn.stream?.getTracks().forEach(track => track.stop());
     capture = null;
   }
@@ -611,6 +757,7 @@
   async function finishCapture(turn, chunks) {
     if (capture !== turn) return;
     clearTimeout(turn.timer);
+    stopSpeechDetection(turn);
     turn.stream.getTracks().forEach(track => track.stop());
     turn.stream = null;
     const blob = new Blob(chunks, {type: turn.recorder.mimeType || 'audio/webm'});
@@ -634,6 +781,7 @@
           audioBase64: btoa(binary),
           conversation: true,
           model: turn.model,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           history: modelHistory(dialogMessages(dialogId), 8).map(message => ({...message, text: message.text.slice(0, 1200)})),
           preferences: storage.read('replyPrefs', ''),
         }),
@@ -657,15 +805,60 @@
   }
 
   function submitCapture(turn) {
+    if (capture !== turn || turn.recorder.state !== 'recording') return;
     turn.committed = true;
+    stopSpeechDetection(turn);
     turn.recorder.stop();
   }
 
-  async function toggleRecording(session) {
-    if (capture?.recorder?.state === 'recording') {
-      submitCapture(capture);
-      return;
+  function stopSpeechDetection(turn) {
+    clearInterval(turn.silenceTimer);
+    turn.inputNode?.disconnect();
+    turn.inputNode = null;
+  }
+
+  function detectEndOfSpeech(turn) {
+    const context = turn.session.audioContext;
+    if (!context || context.state === 'closed') return false;
+    try {
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      turn.inputNode = context.createMediaStreamSource(turn.stream);
+      turn.inputNode.connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      let noise = 0.004, activeFrames = 0, lastSpeech = 0;
+      const started = performance.now();
+      turn.silenceTimer = setInterval(() => {
+        if (capture !== turn || turn.recorder.state !== 'recording') return;
+        const now = performance.now();
+        if (context.state !== 'running') {
+          if (now - started > 12000) submitCapture(turn);
+          return;
+        }
+        analyser.getFloatTimeDomainData(samples);
+        const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
+        if (rms > Math.min(0.065, Math.max(0.011, noise * 2.6))) {
+          activeFrames++;
+          if (activeFrames >= 2 || lastSpeech) lastSpeech = now;
+        } else {
+          activeFrames = 0;
+          if (!lastSpeech) noise = noise * 0.9 + Math.min(rms, 0.02) * 0.1;
+        }
+        if (lastSpeech && now - lastSpeech >= 850) submitCapture(turn);
+        if (!lastSpeech && now - started >= 9000) {
+          releaseCapture(turn);
+          if (turn.recorder.state === 'recording') turn.recorder.stop();
+          if (activeVoice(turn.session)) voiceState('ready', 'Не услышал речь. Нажми «Говорить» и попробуй снова.');
+        }
+      }, 65);
+      return true;
+    } catch {
+      stopSpeechDetection(turn);
+      return false;
     }
+  }
+
+  async function toggleRecording(session) {
     if (capture || pending.has(dialogId)) return;
     const inform = message => activeVoice(session) && voiceState('ready', message);
     if (!API_ENDPOINT) return inform('Сервер LUMI недоступен.');
@@ -677,6 +870,11 @@
     resetPlayback();
     voiceState('waiting', 'Запрашиваю доступ к микрофону…');
     try {
+      try {
+        const Context = window.AudioContext || window.webkitAudioContext;
+        if (Context && !session.audioContext) session.audioContext = new Context();
+        if (session.audioContext?.state === 'suspended') session.audioContext.resume().catch(() => {});
+      } catch {}
       turn.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1}});
       if (capture !== turn) { turn.stream.getTracks().forEach(track => track.stop()); return; }
       const formats = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
@@ -693,8 +891,9 @@
         inform('Ошибка записи. Попробуй ещё раз.');
       };
       recorder.start();
-      turn.timer = setTimeout(() => { if (recorder.state === 'recording') submitCapture(turn); }, 25000);
-      voiceState('listening', 'Слушаю. Нажми «Готово», когда закончишь.');
+      const canDetect = detectEndOfSpeech(turn);
+      turn.timer = setTimeout(() => submitCapture(turn), canDetect ? 25000 : 12000);
+      voiceState('listening', canDetect ? 'Слушаю. После паузы отвечу автоматически.' : 'Слушаю. Запись отправится через 12 секунд.');
     } catch (error) {
       if (capture !== turn) return;
       releaseCapture(turn);
@@ -720,6 +919,7 @@
       if (turn.recorder?.state === 'recording') turn.recorder.stop();
     }
     voiceSession?.abort();
+    voiceSession?.audioContext?.close().catch(() => {});
     voiceSession = null;
     resetPlayback();
     if (current === activeTab) tg?.BackButton?.hide();
@@ -886,7 +1086,8 @@
     loadingNews=true;
     const list=$('#news-list');
     try {
-      const res=await fetch(API_ENDPOINT.replace(/\/$/,'')+'/news');
+      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res=await fetch(API_ENDPOINT.replace(/\/$/,'')+'/news?timeZone='+encodeURIComponent(zone));
       if(!res.ok) throw Error();
       const {items}=await res.json();
       const links=items.map(item=>{

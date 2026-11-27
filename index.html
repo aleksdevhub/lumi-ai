@@ -6,7 +6,7 @@
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js?65"></script>
   <script>try { if (localStorage.getItem('lumi:theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
-  <link rel="stylesheet" href="style.css?v=flash-lumi-1">
+  <link rel="stylesheet" href="style.css?v=lumi-live-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar" hidden>
@@ -51,8 +51,9 @@
           <div class="suggestions">
             <button data-prompt="Помоги составить план на день. "><span data-icon="calendar"></span>Составить план</button>
             <button data-prompt="Помоги отредактировать текст. "><span data-icon="note"></span>Улучшить текст</button>
-            <button data-prompt="Покажи свежие новости"><span data-icon="news"></span>Свежие новости</button>
-            <button data-open="weather"><span data-icon="sun"></span>Узнать погоду</button>
+            <button data-prompt="Какие сегодня новости?"><span data-icon="news"></span>Свежие новости</button>
+            <button data-prompt="Какая сейчас погода?"><span data-icon="sun"></span>Узнать погоду</button>
+            <button data-prompt="Нарисуй "><span data-icon="spark"></span>Создать изображение</button>
           </div>
         </div>
         <div class="messages" id="messages" aria-live="polite"></div>
@@ -201,4 +202,4 @@
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=flash-lumi-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script type="module" src="app.js?v=lumi-live-1"></script></body></html>

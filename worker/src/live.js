@@ -1,7 +1,7 @@
 const agent = 'LumiAssistant/1.0 (+https://github.com/aleksdevhub/lumi-ai)';
 
-async function read(url, format) {
-  const res = await fetch(url, {headers:{'User-Agent':agent}, signal:AbortSignal.timeout(7000)});
+async function read(url, format, timeout = 7000) {
+  const res = await fetch(url, {headers:{'User-Agent':agent}, signal:AbortSignal.timeout(timeout)});
   if (!res.ok) throw Error('Source unavailable');
   return format === 'json' ? res.json() : res.text();
 }
@@ -22,7 +22,7 @@ function rss(xml) {
     const field = tag => plain(item.match(new RegExp('<'+tag+'(?:\\s[^>]*)?>([\\s\\S]*?)</'+tag+'>','i'))?.[1] || '');
     const title=field('title').slice(0,200),url=field('link');
     if(!title || !/^https:\/\/[^\s]+$/i.test(url) || url.length>2200) continue;
-    rows.push({title,url,snippet:field('description').slice(0,450),date:field('pubDate')});
+    rows.push({title,url,snippet:field('description').slice(0,450),date:field('pubDate'),category:field('category')});
   }
   return rows;
 }
@@ -43,23 +43,56 @@ async function webSearch(query) {
 }
 
 const newsCache = new Map();
+async function recentFeed(url, timeout) {
+  try {
+    return rss(await read(url, 'rss', timeout)).filter(item => {
+      const age = Date.now() - Date.parse(item.date);
+      return age >= -3600000 && age < 7 * 86400000;
+    });
+  } catch { return []; }
+}
+
+let worldNewsCache;
+export async function worldNews(timeZone) {
+  if (!worldNewsCache || Date.now() - worldNewsCache.at > 300000) {
+    const sources = await Promise.all([
+      recentFeed('https://www.interfax.ru/rss.asp', 3500).then(items => items.filter(item => item.url.includes('/world/'))),
+      recentFeed('https://lenta.ru/rss/news', 3500).then(items => items.filter(item => /мир|международ/i.test(item.category))),
+      recentFeed('https://feeds.bbci.co.uk/news/world/rss.xml', 3500),
+      recentFeed('https://www.theguardian.com/world/rss', 3500),
+    ]);
+    if (sources.some(items => items.length)) worldNewsCache = {sources, at: Date.now()};
+  }
+  const sources = worldNewsCache?.sources || [];
+  let formatter;
+  try { formatter = new Intl.DateTimeFormat('sv-SE', {timeZone}); }
+  catch { formatter = new Intl.DateTimeFormat('sv-SE', {timeZone: 'UTC'}); }
+  const today = formatter.format();
+  const picked = [];
+  const seen = new Set();
+  for (const onlyToday of [true, false]) {
+    for (const source of sources) {
+      for (const item of source.filter(row => !onlyToday || formatter.format(new Date(row.date)) === today).slice(0, 2)) {
+        if (seen.has(item.title)) continue;
+        seen.add(item.title);
+        picked.push(item);
+      }
+    }
+    if (picked.length) return {items: picked.slice(0, 6), isToday: onlyToday};
+  }
+  return {items: [], isToday: false};
+}
+
 async function news(query) {
   const key=query.toLowerCase().trim();
   const cached=newsCache.get(key);
   if(cached && Date.now()-cached.at<300000) return cached.rows;
   const google=new URL(key?'https://news.google.com/rss/search':'https://news.google.com/rss');
   google.search=new URLSearchParams({hl:'ru',gl:'RU',ceid:'RU:ru',...(key && {q:key+' when:7d'})});
-  async function feed(url) {
-    try {
-      return rss(await read(url,'rss')).filter(item=>{
-        const age=Date.now()-Date.parse(item.date);
-        return age>=-3600000 && age<7*86400000;
-      });
-    } catch {return [];}
-  }
+  const feed = recentFeed;
   let rows=key ? await feed(google) : [];
   if(!rows.length) {
-    const feeds=await Promise.all(['https://www.interfax.ru/rss.asp','https://feeds.bbci.co.uk/russian/rss.xml','https://lenta.ru/rss/news'].map(feed));
+    const feeds=await Promise.all(['https://www.interfax.ru/rss.asp','https://feeds.bbci.co.uk/russian/rss.xml','https://lenta.ru/rss/news'].map(url => feed(url)));
     const tokens=key.split(/[^\p{L}\p{N}]+/u).filter(w=>w.length>=2).map(w=>w.slice(0,5));
     rows=feeds.flat().filter(item=>!key || tokens.length && tokens.every(t=>(item.title+' '+item.snippet).toLowerCase().includes(t)));
     if(!rows.length && !key) rows=await feed(google);
@@ -78,10 +111,19 @@ async function news(query) {
   return picked;
 }
 
-async function weather(city) {
-  const locator = new URL('https://geocoding-api.open-meteo.com/v1/search');
-  locator.search = new URLSearchParams({name:city,count:'1',language:'ru'});
-  const place=(await read(locator,'json')).results?.[0];
+async function weather(city, coords) {
+  let place = coords;
+  if (city) {
+    const locator = new URL('https://geocoding-api.open-meteo.com/v1/search');
+    const find = async name => {
+      locator.search = new URLSearchParams({name, count: '1', language: 'ru'});
+      return (await read(locator, 'json')).results?.[0];
+    };
+    const mapped = {москве: 'Москва', казани: 'Казань', петербурге: 'Санкт-Петербург', 'санкт-петербурге': 'Санкт-Петербург', сочи: 'Сочи'};
+    const normalized = mapped[city.toLowerCase()] || city;
+    place = await find(normalized);
+    if (!place && /(?:е|и|у)$/iu.test(normalized)) place = await find(normalized.slice(0, -1));
+  }
   if (!place) return [];
   const url = new URL('https://api.open-meteo.com/v1/forecast');
   url.search = new URLSearchParams({latitude:place.latitude,longitude:place.longitude,timezone:'auto',forecast_days:'7',
@@ -89,7 +131,7 @@ async function weather(city) {
     daily:'temperature_2m_min,temperature_2m_max,precipitation_probability_max,weather_code'});
   const data=await read(url,'json');
   if(!Number.isFinite(data.current?.temperature_2m) || !Array.isArray(data.daily?.time)) return [];
-  const location=[...new Set([place.name,place.admin1,place.country].filter(Boolean))].join(', ');
+  const location=[...new Set([place.name,place.admin1,place.country].filter(Boolean))].join(', ') || 'Твоё местоположение';
   return [{title:'Open-Meteo · '+location,url:url.href,location,timezone:data.timezone,
     current:data.current,units:data.current_units,daily:data.daily,dailyUnits:data.daily_units}];
 }
@@ -126,10 +168,10 @@ export async function readPage(address) {
 }
 
 export async function lookup(kind,query) {
-  if(typeof query!=='string') return [];
-  query=query.trim().slice(0,200);
   try {
-    if(kind==='weather' && query) return await weather(query);
+    if (kind === 'weather' && query && typeof query === 'object') return await weather(query.city, query.coords);
+    if(typeof query!=='string') return [];
+    query=query.trim().slice(0,200);
     if(kind==='news') return await news(query);
     if(kind==='search' && query) return await webSearch(query);
   } catch { /* A missing feed must not turn into a model-generated live result. */ }

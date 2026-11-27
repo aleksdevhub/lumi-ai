@@ -4,6 +4,7 @@
   "main": "src/index.js",
   "compatibility_date": "2026-11-26",
   "workers_dev": true,
+  "ai": {"binding": "AI"},
   "durable_objects": {"bindings":[{"name":"PC_RELAY","class_name":"PcRelay"}]},
   "migrations": [{"tag":"pc-relay-v1","new_sqlite_classes":["PcRelay"]}],
   "vars": {

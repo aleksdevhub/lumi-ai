@@ -1,10 +1,21 @@
-import {lookup} from './live.js';
+import {worldNews} from './live.js';
 import {answer, answerAudio} from './assistant.js';
+import {imageRequest} from '../../intents.mjs';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
 export {PcRelay};
 const encoder = new TextEncoder();
 const recent = new Map();
+
+function localContext(body) {
+  const {latitude, longitude} = body.coords || {};
+  return {
+    coords: Number.isFinite(latitude) && Math.abs(latitude) <= 90 &&
+      Number.isFinite(longitude) && Math.abs(longitude) <= 180 ? {latitude, longitude} : undefined,
+    city: typeof body.weatherCity === 'string' ? body.weatherCity.trim().slice(0, 60) : '',
+    timeZone: typeof body.timeZone === 'string' && body.timeZone.length <= 64 ? body.timeZone : 'UTC',
+  };
+}
 
 function response(data, status, origin) {
   const headers = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Vary": "Origin" };
@@ -61,11 +72,12 @@ export default {
       return welcomeTelegram(request, env.TELEGRAM_BOT_TOKEN);
     }
     if (request.method === 'GET' && url.pathname === '/news') {
-      const items=await lookup('news','');
-      return response({items},items.length?200:503,allowed);
+      const timeZone = (url.searchParams.get('timeZone') || 'UTC').slice(0, 64);
+      const {items} = await worldNews(timeZone);
+      return response({items: items.map(({title,url,date}) => ({title,url,date}))}, items.length ? 200 : 503, allowed);
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
-      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true,
+      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, imageGeneration: !!env.AI,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
@@ -178,7 +190,7 @@ export default {
           .map(item => ({role: item.role === 'assistant' ? 'model' : 'user', parts: [{text: item.text.slice(0, 1200)}]})) : [];
         const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0, 500) : '';
         try {
-          const turn = await answerAudio(env, history, audio, geminiMimeType, preferences, body.model);
+          const turn = await answerAudio(env, history, audio, geminiMimeType, preferences, body.model, localContext(body));
           if (!turn.transcript) return response({error: 'Речь не распознана. Попробуй ещё раз.'}, 422, allowed);
           return response(turn, 200, allowed);
         } catch (error) {
@@ -264,9 +276,27 @@ export default {
     }
     if (!contents.length || contents.at(-1).role !== "user") return response({ error: "Send a message to begin" }, 400, allowed);
     if (photoRequest) contents.at(-1).parts.push({ inlineData: { mimeType: "image/jpeg", data: body.photo } });
+    const image = !photoRequest && imageRequest(contents.at(-1).parts[0].text);
+    if (image) {
+      if (!image.prompt) return response({reply: 'Что нарисовать? Например: «Нарисуй ночной город под дождём».'}, 200, allowed);
+      if (image.prompt.length > 1600) return response({error: 'Сократи описание изображения до 1600 символов.'}, 400, allowed);
+      if (!env.AI) return response({error: 'Генератор изображений сейчас недоступен.'}, 503, allowed);
+      const key = 'image:' + user.id;
+      const now = Date.now();
+      const usage = (recent.get(key) || []).filter(at => now - at < 60000);
+      if (usage.length >= 2) return response({error: 'Подожди минуту перед следующим изображением.'}, 429, allowed);
+      recent.set(key, [...usage, now]);
+      try {
+        const output = await env.AI.run('@cf/black-forest-labs/flux-1-schnell', {prompt: image.prompt, steps: 4});
+        if (typeof output?.image !== 'string' || !output.image.startsWith('/9j/') || output.image.length > 5000000) throw Error();
+        return response({reply: 'Изображение готово.', image: output.image}, 200, allowed);
+      } catch {
+        return response({error: 'Генератор не вернул изображение. Попробуй чуть позже.'}, 502, allowed);
+      }
+    }
     try {
       const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0,500) : '';
-      return response(await answer(env,contents,preferences,body.memory,body.model),200,allowed);
+      return response(await answer(env,contents,preferences,body.memory,body.model,false,localContext(body)),200,allowed);
     } catch (error) {
       return response({error:error.status===429?'Достигнут лимит модели. Попробуй позже.':'Не удалось получить ответ от модели. Попробуй позже.'},error.status===429?429:502,allowed);
     }
