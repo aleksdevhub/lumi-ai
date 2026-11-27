@@ -70,19 +70,27 @@ async function weatherReply(request, coords) {
   };
 }
 
-async function headlinesReply(request, timeZone) {
-  if (request.topic) {
-    const items = await lookup('news', request.topic);
-    return items.length ? {
-      reply: 'Свежие новости по теме «' + request.topic + '»\n\n' + fallback('news', items),
-      sources: items.map(({title,url}) => ({title,url})), checkedAt: new Date().toISOString(),
-    } : {reply: 'Свежих публикаций по этой теме не нашлось. Попробуй сформулировать тему короче.'};
-  }
-  const {items, isToday} = await worldNews(timeZone);
-  if (!items.length) return {reply: 'Мировые новостные ленты сейчас недоступны. Попробуй чуть позже.'};
+async function headlinesReply(request, timeZone, includeEvidence = false) {
+  const rows = request.topic ? await lookup('news', request.topic) : (await worldNews(timeZone)).items;
+  const items = rows.slice(0, request.count || (request.topic ? 4 : 6));
+  if (!items.length) return {reply: request.topic
+    ? 'Свежих публикаций по этой теме не нашлось. Попробуй сформулировать тему короче.'
+    : 'Мировые новостные ленты сейчас недоступны. Попробуй чуть позже.'};
+  let dateFormat;
+  try { dateFormat = new Intl.DateTimeFormat('ru-RU', {dateStyle:'short', timeZone}); }
+  catch { dateFormat = new Intl.DateTimeFormat('ru-RU', {dateStyle:'short', timeZone:'UTC'}); }
+  const todayCount = items.filter(item => item.isToday).length;
+  const title = request.topic ? 'Свежие новости по теме «' + request.topic + '»'
+    : todayCount === items.length ? 'Мировые новости сегодня' : 'Последние мировые новости из доступных лент';
+  const details = items.map(({title,date}, i) => (i+1) + '. ' + title + ' (' + dateFormat.format(new Date(date)) + ')').join('\n');
+  const caveat = !request.topic && todayCount < items.length
+    ? '\nЗа сегодня найдено ' + todayCount + ' из ' + items.length + ' публикаций. Более ранние отмечены датами.'
+    : '';
+  const shortfall = request.count > items.length ? '\nНайдено ' + items.length + ' публикаций из запрошенных ' + request.count + '.' : '';
   return {
-    reply: (isToday ? 'Мировые новости сегодня' : 'Последние мировые новости из доступных лент') + '\n\n' + fallback('news', items.map(item => ({...item,snippet:''}))),
+    reply: title + caveat + shortfall + '\n\n' + details,
     sources: items.map(({title,url}) => ({title,url})), checkedAt: new Date().toISOString(),
+    ...(includeEvidence && {evidence: items.map(({title,url,date,snippet}) => ({title,url,date,snippet}))}),
   };
 }
 
@@ -167,15 +175,16 @@ export async function answerAudio(env, history, audio, mimeType, preferences, se
 
 export async function answer(env, contents, preferences, memory = [], selection, forceLive = false, context = {}) {
   const model = chatModel(env, selection);
-  if (model !== novaModel) return answerWithModel(env, model, contents, preferences, memory, forceLive, context);
-
   if (contents.at(-1).parts.length === 1) {
     const question = contents.at(-1).parts[0].text;
+    const headlines = newsRequest(question);
+    if (headlines?.direct && !headlines.analysis && !forceLive) return headlinesReply(headlines, context.timeZone);
     const weather = weatherRequest(question);
-    if (weather && !weatherAnalysis.test(question) && (weather.city || context.coords || context.city)) {
+    if (model === novaModel && weather && !weatherAnalysis.test(question) && (weather.city || context.coords || context.city)) {
       return weatherReply({...weather, city: weather.city || (!context.coords ? context.city : '')}, context.coords);
     }
   }
+  if (model !== novaModel) return answerWithModel(env, model, contents, preferences, memory, forceLive, context);
 
   if (Date.now() >= novaRetryAt) {
     try {
@@ -216,8 +225,10 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
   contents = [...contents.slice(0, -1), last];
   const question = last.parts[0].text;
   const startedAt = Date.now();
-  const mandatory = forceLive || /(?:найди в (?:интернете|сети)|посмотри в интернете|погугли|search the web)/iu.test(question);
-  const jsonOnly = !context.voice && !mandatory && !weatherRequest(question) && !newsRequest(question) &&
+  const headlines = newsRequest(question);
+  const mandatory = forceLive || /(?:найди в (?:интернете|сети)|посмотри в интернете|погугли|search the web)/iu.test(question) ||
+    Boolean(headlines?.analysis && /свеж|последн|сегодня|только что/iu.test(question));
+  const jsonOnly = !context.voice && !mandatory && !weatherRequest(question) && !headlines &&
     /^(?:пожалуйста[, ]+)?(?:(?:верни|выведи|дай|ответь)\s+(?:мне\s+)?(?:только\s+)?(?:в\s+формате\s+)?(?:валидный\s+)?json\b|(?:return|output|respond with)\s+(?:only\s+)?(?:valid\s+)?json\b)/iu.test(question);
   const complex = question.length > 420 || /(?:докажи|реши задачу|сравни|разбери подробно|проанализируй|отладь|проверь код|debug|prove|analy[sz]e)/iu.test(question);
   const respond = (messages, config) => {
@@ -236,8 +247,6 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
     if (weather && !weatherAnalysis.test(question)) {
       return weatherReply({...weather, city: weather.city || (!context.coords ? context.city : '')}, context.coords);
     }
-    const headlines = newsRequest(question);
-    if (headlines) return headlinesReply(headlines, context.timeZone);
   }
   if (Array.isArray(memory) && memory.length) {
     const notes=memory.slice(0,3).map(n=>({title:String(n?.title||'').slice(0,160),excerpt:String(n?.excerpt||'').slice(0,450),url:String(n?.url||'').slice(0,500),date:String(n?.date||'').slice(0,30)}));
@@ -270,7 +279,7 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
       const timeout = Math.min(9000, 38000 - (Date.now() - startedAt));
       return {reply: timeout >= 2500 ? await reviewDraft(respond, contents, reply, timeout) : reply};
     }
-    if (novaMode || calls.some(call => call.name === 'calculate') || weatherAnalysis.test(question) && calls.some(call => call.name === 'weather')) {
+    if (novaMode || calls.some(call => call.name === 'calculate' || call.name === 'news') || weatherAnalysis.test(question) && calls.some(call => call.name === 'weather')) {
       return answerWithTools(respond, contents, parts, calls, question, context);
     }
     const [call] = calls;
@@ -385,7 +394,11 @@ async function lookupReply(name, query, question, context) {
     const tomorrow = timing?.tomorrow || /завтра|tomorrow/iu.test(question);
     return weatherReply({city, days, tomorrow}, context.coords);
   }
-  if (name === 'news') return headlinesReply({topic: typeof query === 'string' ? query : ''}, context.timeZone);
+  if (name === 'news') {
+    const parsed = newsRequest(question);
+    const topic = (typeof query === 'string' ? query.trim().slice(0, 90) : '') || parsed?.topic || '';
+    return headlinesReply({topic, count: parsed?.count}, context.timeZone, true);
+  }
   let rows;
   let page;
   if(name==='read_page') {

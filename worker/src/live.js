@@ -53,6 +53,28 @@ async function recentFeed(url, timeout) {
 }
 
 let worldNewsCache;
+function noDuplicateHeadlines(rows, limit) {
+  const picked = [];
+  const urls = new Set();
+  const titles = new Set();
+  for (const item of rows) {
+    let address;
+    try { address = new URL(item.url); } catch { continue; }
+    address.hash = '';
+    for (const key of [...address.searchParams.keys()]) {
+      if (/^(?:utm_|fbclid$|gclid$)/i.test(key)) address.searchParams.delete(key);
+    }
+    const url = address.href;
+    const title = item.title.toLowerCase().replaceAll('ё','е').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    if (urls.has(url) || titles.has(title)) continue;
+    urls.add(url);
+    titles.add(title);
+    picked.push(item);
+    if (picked.length >= limit) break;
+  }
+  return picked;
+}
+
 export async function worldNews(timeZone) {
   if (!worldNewsCache || Date.now() - worldNewsCache.at > 300000) {
     const sources = await Promise.all([
@@ -68,19 +90,9 @@ export async function worldNews(timeZone) {
   try { formatter = new Intl.DateTimeFormat('sv-SE', {timeZone}); }
   catch { formatter = new Intl.DateTimeFormat('sv-SE', {timeZone: 'UTC'}); }
   const today = formatter.format();
-  const picked = [];
-  const seen = new Set();
-  for (const onlyToday of [true, false]) {
-    for (const source of sources) {
-      for (const item of source.filter(row => !onlyToday || formatter.format(new Date(row.date)) === today).slice(0, 2)) {
-        if (seen.has(item.title)) continue;
-        seen.add(item.title);
-        picked.push(item);
-      }
-    }
-    if (picked.length) return {items: picked.slice(0, 6), isToday: onlyToday};
-  }
-  return {items: [], isToday: false};
+  const items = noDuplicateHeadlines(sources.flat().sort((a,b) => Date.parse(b.date) - Date.parse(a.date)), 6)
+    .map(item => ({...item, isToday: formatter.format(new Date(item.date)) === today}));
+  return {items};
 }
 
 async function news(query) {
@@ -90,20 +102,10 @@ async function news(query) {
   const google=new URL(key?'https://news.google.com/rss/search':'https://news.google.com/rss');
   google.search=new URLSearchParams({hl:'ru',gl:'RU',ceid:'RU:ru',...(key && {q:key+' when:7d'})});
   const feed = recentFeed;
-  let rows=key ? await feed(google) : [];
-  if(!rows.length) {
-    const feeds=await Promise.all(['https://www.interfax.ru/rss.asp','https://feeds.bbci.co.uk/russian/rss.xml','https://lenta.ru/rss/news'].map(url => feed(url)));
-    const tokens=key.split(/[^\p{L}\p{N}]+/u).filter(w=>w.length>=2).map(w=>w.slice(0,5));
-    rows=feeds.flat().filter(item=>!key || tokens.length && tokens.every(t=>(item.title+' '+item.snippet).toLowerCase().includes(t)));
-    if(!rows.length && !key) rows=await feed(google);
-  }
-  const picked=[], seen=new Set();
-  for(const item of rows.sort((a,b)=>Date.parse(b.date)-Date.parse(a.date))) {
-    if(seen.has(item.title)) continue;
-    seen.add(item.title);
-    picked.push({title:item.title,url:item.url,date:item.date});
-    if(picked.length===4) break;
-  }
+  const [searchResults, ...feeds] = await Promise.all([google,'https://www.interfax.ru/rss.asp','https://feeds.bbci.co.uk/russian/rss.xml','https://lenta.ru/rss/news'].map(url => feed(url,3500)));
+  const tokens=key.split(/[^\p{L}\p{N}]+/u).filter(w=>w.length>=3 && !['про','для','что','или','как'].includes(w)).map(w=>w.slice(0,5));
+  const matching = feeds.flat().filter(item=>!key || tokens.length && tokens.every(t=>(item.title+' '+item.snippet).toLowerCase().includes(t)));
+  const picked = noDuplicateHeadlines([...matching, ...searchResults].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)), 6);
   if(picked.length) {
     if(newsCache.size>=64) newsCache.delete(newsCache.keys().next().value);
     newsCache.set(key,{rows:picked,at:Date.now()});
