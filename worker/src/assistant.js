@@ -26,6 +26,11 @@ export const novaBackupModel = 'gemini-3.8-flash';
 let flashRetryAt = 0;
 let novaRetryAt = 0;
 
+function retryableModelError(error) {
+  return [404, 429, 500, 502, 503, 504].includes(error.upstreamStatus) ||
+    error.name === 'TimeoutError' || error.name === 'AbortError';
+}
+
 async function weatherReply(request, coords) {
   if (!request.city && !coords) return {reply: 'Разреши LUMI доступ к геопозиции или укажи город.'};
   const [forecast] = await lookup('weather', {city: request.city, coords});
@@ -168,16 +173,21 @@ export async function answer(env, contents, preferences, memory = [], selection,
     try {
       return await answerWithModel(env, model, contents, preferences, memory, forceLive, context);
     } catch (error) {
-      const timeout = error.name === 'TimeoutError' || error.name === 'AbortError';
-      const unavailable = [404, 429, 500, 502, 503, 504].includes(error.upstreamStatus);
-      if (!timeout && !unavailable) throw error;
-      if (unavailable) novaRetryAt = Date.now() + 30000;
+      if (!retryableModelError(error)) throw error;
+      if (error.upstreamStatus) novaRetryAt = Date.now() + 30000;
       console.warn('Nova temporarily unavailable', {reason: error.upstreamStatus || 'timeout'});
     }
   }
 
-  const result = await answerWithModel(env, novaBackupModel, contents, preferences, memory, forceLive, context);
-  return {...result, usedFallback: true};
+  try {
+    const result = await answerWithModel(env, novaBackupModel, contents, preferences, memory, forceLive, context);
+    return {...result, usedFallback: true};
+  } catch (error) {
+    const lite = liteModel(env);
+    if (!retryableModelError(error) || [novaModel, novaBackupModel].includes(lite)) throw error;
+    const result = await answerWithModel(env, lite, contents, preferences, memory, forceLive, {...context, backupTimeout: 12000});
+    return {...result, usedFallback: true};
+  }
 }
 
 async function answerWithModel(env, model, contents, preferences, memory, forceLive, context) {
@@ -197,7 +207,7 @@ async function answerWithModel(env, model, contents, preferences, memory, forceL
   const respond = (messages, config) => {
     const options = {
       thinkingLevel: nova ? (context.voice ? 'high' : novaThinking) : model === novaBackupModel ? 'low' : (complex ? 'LOW' : 'MINIMAL'),
-      timeout: nova ? (context.voice ? 14000 : 32000) : (context.voice ? 10500 : complex ? 27000 : 18000),
+      timeout: context.backupTimeout || (nova ? (context.voice ? 14000 : 32000) : (context.voice ? 10500 : complex ? 27000 : 18000)),
       ...(novaMode && {generationConfig: {maxOutputTokens: context.voice ? 4096 : 16384}}),
       ...(!novaMode && context.voice && {generationConfig: {maxOutputTokens: 550}}),
       ...config,
