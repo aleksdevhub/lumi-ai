@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#101010"><meta name="description" content="LUMI — личный AI-ассистент в Telegram">
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=graphite-1">
+  <link rel="stylesheet" href="style.css?v=cards-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar">
@@ -14,16 +14,6 @@
     <button type="button" class="icon-button" data-new-chat aria-label="Новый чат" title="Новый чат">＋</button>
   </header>
   <main>
-    <section class="view" id="home">
-      <div class="hero"><h1>Обзор</h1>
-        <button class="ask-card" data-open="chat"><span class="ask-icon">＋</span><span><strong>Открыть чат</strong><small>Перейти к переписке</small></span></button>
-      </div>
-      <div class="section-heading"><span>МОЙ ДЕНЬ</span><button data-open="day">Все планы</button></div>
-      <button class="day-card" data-open="day"><span><span class="day-date" id="today"></span><strong id="day-count">Тихий день</strong><span class="day-preview" id="day-preview">Можно добавить что-нибудь важное</span></span><span class="day-mark">›</span></button>
-      <div class="section-heading services-title"><span>ИНСТРУМЕНТЫ</span></div>
-      <div class="service-grid"><button class="service" data-open="weather"><span class="service-icon">◒</span><strong>Погода</strong><small>На сегодня</small></button><button class="service" data-open="maps"><span class="service-icon">⌖</span><strong>Карты</strong><small>Найти место</small></button><button class="service" data-open="notes"><span class="service-icon">▤</span><strong>Память</strong><small>Заметки</small></button><button class="service" data-open="news"><span class="service-icon">◉</span><strong>Новости</strong><small>Главное</small></button></div>
-
-    </section>
     <section class="view active" id="chat" aria-label="Чат">
       <div id="chat-scroll">
         <div id="welcome">
@@ -55,8 +45,30 @@
         </div>
       </form>
     </section>
-    <section class="view" id="services"><div class="view-head"><h2>Инструменты</h2></div><div class="service-list"><button data-open="weather"><span>◒</span><div><strong>Погода</strong><small>Прогноз рядом с тобой</small></div><b>→</b></button><button data-open="maps"><span>⌖</span><div><strong>Карты</strong><small>Ищи адреса и места</small></div><b>→</b></button><button data-open="notes"><span>▤</span><div><strong>Память</strong><small>Личные заметки</small></div><b>→</b></button><button data-open="day"><span>◷</span><div><strong>Мой день</strong><small>Планы и задачи</small></div><b>→</b></button><button data-open="history"><span>◌</span><div><strong>Диалоги</strong><small>Недавняя история</small></div><b>→</b></button><button data-open="news"><span>◉</span><div><strong>Новости</strong><small>Лента из открытых источников</small></div><b>→</b></button></div></section>
-    <section class="view" id="profile"><div class="view-head"><h2>Профиль</h2></div><div class="profile-card"><div class="profile-orb">L</div><strong id="profile-name">Привет</strong><small>Личные данные хранятся на устройстве</small></div><div class="settings-list"><div><span>Хранилище</span><small>Локально в этом браузере</small></div><div><span>Модель LUMI</span><small>Подключена через защищённый сервер</small></div><div><span>Версия</span><small>LUMI Mini App · 0.1</small></div><details id="reply-settings"><summary>Как мне отвечать</summary>
+    <section class="view" id="services">
+      <div class="view-head"><h2>Инструменты</h2></div>
+      <div class="tool-grid">
+        <button class="panel tool-card" data-open="weather"><span data-icon="sun"></span><strong>Погода</strong><small>Прогноз рядом</small></button>
+        <button class="panel tool-card" data-open="maps"><span data-icon="map"></span><strong>Карты</strong><small>Адреса и места</small></button>
+        <button class="panel tool-card" data-open="notes"><span data-icon="note"></span><strong>Заметки</strong><small>Мысли и ссылки</small></button>
+        <button class="panel tool-card" data-open="news"><span data-icon="news"></span><strong>Новости</strong><small>Свежие заголовки</small></button>
+      </div>
+    </section>
+    <section class="view" id="profile">
+      <div class="view-head"><h2>Профиль</h2></div>
+      <div class="panel-stack">
+        <form class="panel" id="profile-form">
+          <div class="profile-heading">
+            <span class="profile-orb" id="profile-initial" aria-hidden="true">L</span>
+            <div><h3 id="profile-name">Твой профиль</h3><small id="profile-location" hidden></small></div>
+          </div>
+          <div class="profile-fields">
+            <label>Имя<input id="profile-display-name" autocomplete="nickname" maxlength="60" placeholder="Как тебя зовут?"></label>
+            <label>Город<input id="profile-city" autocomplete="address-level2" maxlength="60" placeholder="Необязательно"></label>
+          </div>
+          <button class="panel-action" type="submit">Сохранить профиль</button>
+        </form>
+        <details class="panel" id="reply-settings"><summary>Ответы и память</summary>
       <label for="reply-prefs">Что учитывать в ответах?</label>
       <textarea id="reply-prefs" rows="3" maxlength="500" placeholder="Например: отвечай кратко и приводи один пример"></textarea>
       <small>Хранится на этом устройстве и передаётся модели вместе с запросом.</small>
@@ -65,11 +77,26 @@
       <small>Публичные ссылки открываются через Jina Reader. Выдержки хранятся на этом устройстве и используются в следующих чатах.</small>
       <details><summary id="web-count">Сохранённые страницы</summary><div id="web-list"></div></details>
       <button id="forget-web" type="button">Очистить память страниц</button>
-    </details><details id="pc-settings"><summary>Синхронизация с ПК</summary><p>Переписки и миниатюры фото будут сохранены в SQL Server на твоём ПК.</p><label>Код с компьютера <input id="pc-code" type="password" autocomplete="off"></label><button id="pc-sync">Синхронизировать</button><button id="pc-forget" hidden>Отключить на устройстве</button><p id="pc-status" role="status"></p></details><button id="clear-data">Очистить локальные данные</button></div></section>
+        </details>
+        <details class="panel" id="pc-settings"><summary>Синхронизация с ПК</summary><p>Переписки и миниатюры фото будут сохранены в SQL Server на твоём ПК.</p><label>Код с компьютера <input id="pc-code" type="password" autocomplete="off"></label><button id="pc-sync">Синхронизировать</button><button id="pc-forget" hidden>Отключить на устройстве</button><p id="pc-status" role="status"></p></details>
+        <details class="panel" id="data-settings">
+          <summary>Данные на устройстве</summary>
+          <p>Здесь хранятся профиль, заметки, планы и локальные копии чатов.</p>
+          <button id="clear-data" type="button">Очистить локальные данные</button>
+        </details>
+      </div>
+    </section>
     <section class="view subview" id="weather"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Погода</h2><p>Прогноз от Open-Meteo.</p></div><div class="weather-card"><div class="weather-main"><span id="weather-icon">◌</span><strong id="temperature">—°</strong></div><div id="weather-place">Определи местоположение</div><small id="weather-detail">Открой доступ к геопозиции</small><button id="locate">Показать погоду <b>→</b></button></div><p class="fineprint">Погода загружается из бесплатного Open-Meteo. Геопозиция используется только для запроса.</p></section>
     <section class="view subview" id="maps"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Карты</h2><p>Найди место в любимых картах.</p></div><form class="search-form" id="map-form"><input id="map-query" placeholder="Адрес или место" aria-label="Адрес или место"><button>Найти <b>→</b></button></form><div class="map-shortcuts"><button data-map="coffee">☕ Кофейня рядом <span>→</span></button><button data-map="restaurant">◒ Поесть рядом <span>→</span></button><button data-map="pharmacy">＋ Аптека рядом <span>→</span></button></div><p class="fineprint">Поиск откроется в Яндекс Картах. LUMI не получает историю поиска.</p></section>
     <section class="view subview" id="notes"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Заметки</h2><p>Заметки видны только тебе на этом устройстве.</p></div><form class="note-form" id="note-form"><textarea id="note-input" placeholder="Мысль, ссылка, что-то важное…" rows="3"></textarea><button class="primary">Сохранить заметку <b>→</b></button></form><div id="notes-list" class="entries"></div></section>
-    <section class="view subview" id="day"><button class="back" data-back>← <span>Главная</span></button><div class="view-head"><div class="eyebrow">ТВОЙ ДЕНЬ · <span id="day-long-date"></span></div><h2>Планы</h2><p>Добавляй планы, отмечай завершённое.</p></div><form class="task-form" id="task-form"><input id="task-input" placeholder="Что хотелось бы сделать?" aria-label="Новый план"><button aria-label="Добавить план">＋</button></form><div id="tasks-list" class="entries"></div></section>
+    <section class="view" id="day">
+      <div class="view-head"><div class="eyebrow" id="day-long-date"></div><h2>Мой день</h2></div>
+      <div class="panel day-planner">
+        <div class="day-progress"><h3>Планы</h3><span id="day-count"></span></div>
+        <form class="task-form" id="task-form"><input id="task-input" maxlength="240" placeholder="Добавить дело" aria-label="Новый план"><button aria-label="Добавить план">＋</button></form>
+        <div id="tasks-list" class="entries"></div>
+      </div>
+    </section>
     <section class="view subview" id="history"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Недавние чаты</h2><button class="new-chat" data-new-chat>＋ Новый чат</button></div><div id="history-list" class="entries"></div><button id="clear-history" class="text-button">Очистить чаты на устройстве</button></section>
     <section class="view subview" id="news"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Новости</h2><p>Открытая новостная лента.</p></div><div id="news-list" class="entries"><div class="empty">Проверяю доступность источника…</div></div><div class="fineprint">Заголовки из открытых новостных лент.</div></section>
   </main>
@@ -78,10 +105,10 @@
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
     <nav aria-label="Разделы">
       <button class="tab active" data-tab="chat"><span data-icon="chat"></span>Чат</button>
-      <button class="tab" data-tab="home"><span data-icon="home"></span>Обзор</button>
+      <button class="tab" data-tab="day"><span data-icon="calendar"></span>Мой день</button>
       <button class="tab" data-tab="services"><span data-icon="grid"></span>Инструменты</button>
       <button class="tab" data-tab="profile"><span data-icon="user"></span>Профиль</button>
     </nav>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=graphite-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=cards-1"></script></body></html>

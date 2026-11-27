@@ -13,35 +13,9 @@ button{cursor:pointer}
 .view{display:none;animation:appear .16s ease}
 .view.active{display:block}
 @keyframes appear{from{opacity:.7}to{opacity:1}}
-.hero{text-align:left;padding:44px 0 10px}
 .eyebrow{font-size:13px;letter-spacing:.03em;color:#a8a8a8;font-weight:500}
 .eyebrow i{display:none}
-.hero h1{font-size:clamp(28px,7vw,36px);letter-spacing:-.045em;margin:9px 0 8px;font-weight:600}
-.hero>p,.view-head>p{color:#b0b0b0;font-size:16px;line-height:1.55;margin:0}
-.ask-card{display:flex;align-items:center;text-align:left;width:100%;margin-top:25px;padding:16px;border:1px solid var(--line);background:transparent;border-radius:16px;color:inherit;gap:13px;cursor:pointer;transition:background .15s,border-color .15s}
-.ask-card:hover,.service:hover,.day-card:hover{background:#2a2a2a;border-color:#505050}
-.ask-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#eee;color:#171717;font-size:23px;line-height:1}
-.ask-card span:nth-child(2){flex:1}
-.ask-card strong,.ask-card small{display:block}
-.ask-card strong{font-size:16px;font-weight:600}
-.ask-card small{font-size:14px;color:#aaa;margin-top:5px;line-height:1.4}
-.section-heading{display:flex;justify-content:space-between;align-items:center;margin:32px 1px 12px}
-.section-heading>span{font-size:14px;letter-spacing:0;color:#c2c2c2;font-weight:600}
-.section-heading>button{border:0;background:none;color:#d2d2d2;font-size:14px}
-.day-card{width:100%;padding:16px;text-align:left;background:transparent;border:1px solid var(--line);border-radius:15px;display:flex;justify-content:space-between;align-items:center;color:inherit;transition:background .15s,border-color .15s}
-.day-card>span:first-child{display:block}
-.day-card strong{font-size:16px;font-weight:600;display:block;margin-top:7px}
-.day-card .day-preview{font-size:14px;color:#aaa;display:block;margin-top:5px;line-height:1.4}
-.day-date{font-size:13px;color:#a0a0a0;letter-spacing:0}
-.day-mark{font-size:25px;color:#aaa;padding:0 5px}
-.services-title{margin-top:30px}
-.service-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.service{border:1px solid var(--line);background:transparent;border-radius:14px;padding:15px;text-align:left;color:inherit;min-height:104px;cursor:pointer;transition:background .15s,border-color .15s}
-.service-icon{color:#d0d0d0;display:block;margin-bottom:12px}
-.service strong,.service small{display:block}
-.service strong{font-size:15px;font-weight:600}
-.service small{font-size:13px;color:#aaa;margin-top:5px}
-.home-foot{display:none}
+.view-head>p{color:#b0b0b0;font-size:16px;line-height:1.55;margin:0}
 .view-head{padding:28px 0 22px}
 .view-head .eyebrow{font-size:13px;letter-spacing:0}
 .view-head h2{font-size:28px;letter-spacing:-.04em;font-weight:600;margin:8px 0 6px}
@@ -64,25 +38,7 @@ button{cursor:pointer}
 .voice-status{margin-top:11px;color:#c0c0c0;font-size:14px;line-height:1.5}
 .voice-privacy{display:block;margin-top:10px;color:#aaa;font-size:12px;line-height:1.5}
 .chat-foot{display:block}
-.service-list{border-top:1px solid #ffffff14}
-.service-list>button{width:100%;display:flex;align-items:center;gap:14px;text-align:left;background:none;border:0;border-bottom:1px solid #ffffff14;padding:17px 4px;color:white}
-.service-list>button>span{width:30px;color:#ddd;font-size:19px}
-.service-list>button div{flex:1}
-.service-list strong,.service-list small{display:block}
-.service-list strong{font-size:16px;font-weight:600}
-.service-list small{font-size:14px;color:#aaa;margin-top:4px}
-.service-list b{font-weight:400;color:#aaa;font-size:22px}
-.profile-card{text-align:center;padding:23px 10px;background:transparent;border:1px solid var(--line);border-radius:15px}
-.profile-orb{margin:0 auto 12px;width:50px;height:50px;border:1px solid #555;border-radius:50%;display:grid;place-items:center;background:#383838;font-size:18px}
-.profile-card strong,.profile-card small{display:block}
-.profile-card strong{font-size:16px}
-.profile-card small{font-size:14px;color:#aaa;margin-top:6px}
-.settings-list{margin-top:20px}
-.settings-list div{padding:15px 2px;border-bottom:1px solid #ffffff14}
-.settings-list span,.settings-list small{display:block}
-.settings-list span{font-size:15px}
-.settings-list small{font-size:13px;color:#aaa;margin-top:5px}
-.settings-list button,.text-button{border:0;background:none;color:#ddd;font-size:14px;padding:15px 2px}
+.text-button{border:0;background:none;color:#ddd;font-size:14px;padding:15px 2px}
 .back{margin:16px 0 0;padding:7px 0;color:#eee;border:0;background:none;font-size:15px}
 .back span{font-size:14px;color:#bbb;margin-left:5px}
 .weather-card{border:1px solid var(--line);border-radius:16px;padding:20px;background:transparent}
@@ -124,7 +80,6 @@ button{cursor:pointer}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 svg{width:20px;height:20px;display:block;flex:none}
 .tab span svg{width:20px;height:20px}
-.service-icon svg,.service-list>button>span svg{width:21px;height:21px}
 .ask-icon svg{width:19px;height:19px}
 .send svg,.voice svg{width:19px;height:19px}
 .map-shortcuts button svg{width:17px;height:17px}
@@ -205,9 +160,6 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 #menu nav { display: grid; gap: 4px; }
 .tab { display: flex; align-items: center; gap: 13px; width: 100%; min-height: 48px; padding: 10px 14px; border: 0; border-radius: 12px; background: transparent; color: #ccc; font-size: 16px; text-align: left; }
 .tab.active { background: #323232; color: white; }
-.service-grid { grid-template-columns: 1fr; gap: 0; }
-.service { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 12px; min-height: 55px; border: 0; border-bottom: 1px solid #303030; border-radius: 0; padding: 10px 3px; }
-.service-icon,.service small { margin: 0; }
 .entry .check { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid #666; }
 @media (max-height: 520px) { #welcome { padding-block: 10px; } .fold { display: none; } #welcome h1 { font-size: 28px; } .suggestions { margin-top: 10px; } }
 @media (prefers-reduced-motion: reduce) { *, html { animation: none !important; scroll-behavior: auto !important; } }
@@ -237,12 +189,7 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
 .dialog-link { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dialog-link[aria-current="true"] { background:#303030; }
 .recent-heading { margin:24px 12px 6px; color:#aaa; font-size:14px; }
-#pc-settings { margin:20px 0; }
-#pc-settings p { font-size:14px; color:#bbb; }
-#pc-settings input { width:100%; padding:10px; font-size:16px; }
-#reply-settings { margin:20px 0; }
 #reply-settings label,#reply-settings small { display:block; margin:12px 0; }
-#reply-prefs { width:100%; padding:10px; font:16px/1.5 inherit; font-size:16px; }
 .sources { margin-top:12px; padding-top:9px; border-top:1px solid #444; color:#aaa; font-size:13px; white-space:normal; }
 .sources a { display:block; padding:4px 0; color:#ddd; overflow-wrap:anywhere; }
 .topbar [data-new-chat] { font-size: 25px; }
@@ -250,4 +197,59 @@ main > section { margin-inline: auto; max-width: 720px; padding: 0 var(--gutter)
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   width: 100%; min-height: 44px; padding: 0; color: inherit;
   background: none; border: 0; font: inherit; text-align: left;
+}
+
+.panel {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid #353535;
+  border-radius: 21px;
+  background: #1c1c1c;
+  color: var(--text);
+}
+.panel-stack { display: grid; gap: 10px; }
+.tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tool-card { display: grid; justify-items: start; align-content: start; text-align: left; }
+.tool-card:hover, .dialog-remove:hover { background: #303030; }
+.tool-card [data-icon] {
+  display: grid; place-items: center; width: 40px; height: 40px;
+  margin-bottom: 15px; background: #313131; border-radius: 13px;
+}
+.tool-card strong { font-size: 16px; font-weight: 600; }
+.tool-card small, .profile-heading small, .panel p, .panel small { color: #b8b8b8; }
+.tool-card small { margin-top: 4px; }
+.profile-heading { display: flex; align-items: center; gap: 12px; }
+.profile-heading h3, .day-progress h3 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.profile-heading small { overflow-wrap: anywhere; }
+.profile-orb {
+  flex: none; width: 46px; height: 46px; display: grid; place-items: center;
+  background: #353535; border-radius: 16px; font-size: 19px; font-weight: 600;
+}
+.profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 17px 0 12px; }
+.profile-fields label, #pc-settings label { display: grid; gap: 6px; font-size: 14px; }
+.profile-fields input, #pc-code, #reply-prefs {
+  width: 100%; min-height: 44px; padding: 9px 10px;
+  border: 1px solid #414141; border-radius: 11px; background: #242424; color: var(--text); font-size: 16px;
+}
+.panel > summary { cursor: pointer; font-weight: 600; }
+.panel p, .panel small { font-size: 14px; line-height: 1.45; }
+#profile .panel button {
+  min-height: 44px; padding: 7px 11px; border: 1px solid #454545;
+  border-radius: 12px; background: #292929; color: var(--text); font-size: 14px;
+}
+#profile .panel .panel-action { background: #ececec; border-color: #ececec; color: #151515; font-weight: 600; }
+#profile #clear-data { color: #ffb6b6; }
+#pc-code { margin-bottom: 10px; }
+#pc-status:empty { display: none; }
+.day-progress { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; }
+#day-count { color: #b8b8b8; font-size: 14px; }
+.day-planner .task-form { margin-top: 14px; }
+.day-planner .entries { margin-bottom: 0; }
+.dialog-row { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 4px; }
+#history-list .dialog-row { padding: 3px 5px; background: #1c1c1c; border: 1px solid #353535; border-radius: 15px; }
+.dialog-remove { color: #bdbdbd; }
+
+@media (max-width: 360px) {
+  .profile-fields { grid-template-columns: minmax(0, 1fr); }
+  .tool-card { padding: 13px; }
 }

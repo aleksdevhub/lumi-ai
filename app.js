@@ -6,9 +6,7 @@
   function svgIcon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name]||iconPaths.spark}</svg>`}
   function setIcon(el,name){if(el)el.innerHTML=svgIcon(name)}
   $$('[data-icon]').forEach(element => setIcon(element, element.dataset.icon));
-  $$('.service-icon').forEach((el,i)=>setIcon(el,['sun','map','note','news'][i]));
-  $$('.service-list>button>span').forEach((el,i)=>setIcon(el,['sun','map','note','calendar','history','news'][i]));
-  setIcon($('.ask-icon'),'chat');setIcon($('.send'),'send');setIcon($('.voice'),'mic');
+  setIcon($('.send'),'send');setIcon($('.voice'),'mic');
   $$('.map-shortcuts button').forEach((el,i)=>{el.innerHTML=svgIcon(['map','spark','spark'][i])+' '+el.textContent.replace('→','')+' '+svgIcon('arrow')});
   try { tg?.setHeaderColor('#101010'); tg?.setBackgroundColor('#101010'); } catch {}
   const storage = { read(k, fallback=[]) { try { return JSON.parse(localStorage.getItem('lumi:'+k)) ?? fallback; } catch { return fallback; } }, write(k,v) { localStorage.setItem('lumi:'+k,JSON.stringify(v)); } };
@@ -28,8 +26,9 @@
   storage.write('activeDialog', dialogId);
   const pending = new Set();
   const drafts = new Map();
+  const removedDialogs = new Set(storage.read('removedDialogs'));
   function dialogIds() {
-    return Object.keys(localStorage).filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length));
+    return Object.keys(localStorage).filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length)).filter(id => !removedDialogs.has(id));
   }
   function recentList(container, limit) {
     container.replaceChildren();
@@ -44,7 +43,17 @@
       b.textContent = item.title;
       b.setAttribute('aria-current', String(dialogId === item.id));
       b.onclick = () => openDialog(item.id);
-      container.append(b);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'dialog-remove icon-button';
+      remove.setAttribute('aria-label', 'Удалить чат: ' + item.title);
+      remove.title = 'Удалить чат';
+      remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>';
+      remove.onclick = () => deleteDialog(item.id);
+      const row = document.createElement('div');
+      row.className = 'dialog-row';
+      row.append(b, remove);
+      container.append(row);
     }
     if (!rows.length) container.textContent = 'Здесь появятся твои чаты.';
   }
@@ -71,9 +80,27 @@
   }
   $$('[data-new-chat]').forEach(button => button.onclick = () => openDialog(dialogMessages(dialogId).length || input.value || draftPhoto ? uid() : dialogId));
   const date = new Date();
-  $('#today').textContent = new Intl.DateTimeFormat('ru-RU',{weekday:'long',day:'numeric',month:'long'}).format(date).toUpperCase();
   $('#day-long-date').textContent = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long'}).format(date).toUpperCase();
-  const user = tg?.initDataUnsafe?.user; if (user) { $('#profile-name').textContent = user.first_name || 'Привет'; }
+  const profileForm = $('#profile-form');
+  function renderProfile() {
+    const {name = '', city = ''} = storage.read('profile', {});
+    const displayName = name || tg?.initDataUnsafe?.user?.first_name || '';
+    $('#profile-display-name').value = displayName;
+    $('#profile-city').value = city;
+    $('#profile-name').textContent = displayName || 'Твой профиль';
+    $('#profile-initial').textContent = (Array.from(displayName)[0] || 'L').toLocaleUpperCase('ru-RU');
+    $('#profile-location').textContent = city;
+    $('#profile-location').hidden = !city;
+  }
+  profileForm.addEventListener('submit', event => {
+    event.preventDefault();
+    try {
+      storage.write('profile', {name: $('#profile-display-name').value.trim(), city: $('#profile-city').value.trim()});
+      renderProfile();
+      toast('Профиль сохранён');
+    } catch { toast('Не удалось сохранить профиль на устройстве'); }
+  });
+  renderProfile();
   const viewport = window.visualViewport;
   function fitViewport() {
     if (viewport && viewport.scale === 1) {
@@ -110,7 +137,7 @@
   function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2300)}
   $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.tab,b.dataset.tab)));
   $$('[data-open]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.open,b.dataset.open==='chat'?'chat':'services')));
-  $$('[data-back]').forEach(b=>b.addEventListener('click',()=>show(previous,previous==='home'?'home':'services')));
+  $$('[data-back]').forEach(b=>b.addEventListener('click',()=>show(previous)));
   const photoFile = $('#photo-file');
   const preview = $('#photo-preview');
   let draftPhoto = null;
@@ -423,7 +450,7 @@
   voiceStart.addEventListener('click',()=>toggleRecording(voiceStart,true));
   function speak(text){if(!window.speechSynthesis){voiceStatus.textContent='Озвучка не поддерживается браузером.';return;}const gender=$('#voice-gender').value;const utterance=new SpeechSynthesisUtterance(text);utterance.lang='ru-RU';utterance.rate=1;utterance.pitch=gender==='female'?1.12:.88;const voices=speechSynthesis.getVoices();const matching=voices.find(v=>/^ru/i.test(v.lang)&&new RegExp(gender==='female'?'female|woman|милена|алёна|алена|ирина|жен':'male|man|павел|юрий|муж','i').test(v.name));if(matching)utterance.voice=matching;speechSynthesis.cancel();speechSynthesis.speak(utterance);}
   $('#voice').addEventListener('click',()=>toggleRecording($('#voice'),false));
-  function renderTasks(){const tasks=storage.read('tasks');const list=$('#tasks-list');list.innerHTML='';$('#day-count').textContent=tasks.length?`${tasks.filter(t=>!t.done).length} планов впереди`:'Тихий день';$('#day-preview').textContent=tasks.length?tasks.find(t=>!t.done)?.text||'Всё сделано — можно выдохнуть':'Можно добавить что-нибудь важное';if(!tasks.length){list.innerHTML='<div class="empty">Планов пока нет. Добавь то, о чём хочется помнить.</div>';return;}tasks.forEach(t=>{const row=document.createElement('div');row.className='entry task-entry'+(t.done?' done':'');row.innerHTML=`<button class="check" aria-label="Отметить план">${t.done?'✓':''}</button><span></span><button class="remove" aria-label="Удалить">×</button>`;row.querySelector('span').textContent=t.text;row.querySelector('.check').onclick=()=>{t.done=!t.done;storage.write('tasks',tasks);renderTasks()};row.querySelector('.remove').onclick=()=>{storage.write('tasks',tasks.filter(x=>x.id!==t.id));renderTasks()};list.append(row);});}
+  function renderTasks(){const tasks=storage.read('tasks');const list=$('#tasks-list');list.innerHTML='';$('#day-count').textContent=tasks.length?`Выполнено: ${tasks.filter(t=>t.done).length} из ${tasks.length}`:'Нет дел';if(!tasks.length){list.innerHTML='<div class="empty">Планов пока нет. Добавь то, о чём хочется помнить.</div>';return;}tasks.forEach(t=>{const row=document.createElement('div');row.className='entry task-entry'+(t.done?' done':'');row.innerHTML=`<button class="check" aria-label="Отметить план">${t.done?'✓':''}</button><span></span><button class="remove" aria-label="Удалить">×</button>`;row.querySelector('span').textContent=t.text;row.querySelector('.check').onclick=()=>{t.done=!t.done;storage.write('tasks',tasks);renderTasks()};row.querySelector('.remove').onclick=()=>{storage.write('tasks',tasks.filter(x=>x.id!==t.id));renderTasks()};list.append(row);});}
   $('#task-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#task-input'),text=input.value.trim();if(!text)return;const tasks=storage.read('tasks');tasks.unshift({id:Date.now(),text,done:false});storage.write('tasks',tasks);input.value='';renderTasks()});renderTasks();
   function renderNotes(){const notes=storage.read('notes');const list=$('#notes-list');list.innerHTML='';if(!notes.length){list.innerHTML='<div class="empty">Здесь появятся сохранённые заметки.</div>';return;}notes.forEach(n=>{const row=document.createElement('div');row.className='entry';row.innerHTML='<span></span><button aria-label="Удалить заметку">×</button>';row.querySelector('span').textContent=n.text;const small=document.createElement('small');small.textContent=new Date(n.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});row.querySelector('span').append(small);row.querySelector('button').onclick=()=>{storage.write('notes',notes.filter(x=>x.id!==n.id));renderNotes()};list.append(row);});}
   $('#note-form').addEventListener('submit',e=>{e.preventDefault();const input=$('#note-input'),text=input.value.trim();if(!text)return;const notes=storage.read('notes');notes.unshift({id:Date.now(),text,at:Date.now()});storage.write('notes',notes);input.value='';renderNotes();toast('Заметка сохранена')});renderNotes();
@@ -470,6 +497,7 @@
         const batch = [];
         let size = 0;
         while (pos < upload.length && batch.length < 50) {
+          if (removedDialogs.has(upload[pos].dialog)) { pos++; continue; }
           const next = new TextEncoder().encode(JSON.stringify(upload[pos])).length;
           if (batch.length && size + next > 145000) break;
           batch.push(upload[pos++]); size += next;
@@ -486,6 +514,8 @@
         }
         let visibleChanged = false;
         for (const {dialog,seq,...message} of data.rows) {
+          session.after = seq;
+          if (removedDialogs.has(dialog)) continue;
           const local = dialogMessages(dialog);
           if (!local.some(m => m.id === message.id)) {
             local.push(message);
@@ -494,7 +524,6 @@
             if (dialog===dialogId) visibleChanged=true;
           }
           acknowledged.add(message.id);
-          session.after = seq;
         }
         for (const m of batch) acknowledged.add(m.id);
         storage.write(pcUserKey, session);
@@ -519,6 +548,38 @@
   pcControls();
   scheduleSync();
   function renderHistory(){ recentList($('#history-list'), Infinity); }
+  function deleteDialog(id) {
+    if (pending.has(id) || (id === dialogId && (preparingPhoto || activeRecorder || voicePending))) {
+      toast('Сначала дождись завершения текущего действия');
+      return;
+    }
+    if (!confirm('Удалить этот чат с устройства? Копия в SQL Server, если она есть, сохранится.')) return;
+    try {
+      storage.write('removedDialogs', [...removedDialogs, id]);
+    } catch {
+      toast('Не удалось сохранить удаление на устройстве');
+      return;
+    }
+    removedDialogs.add(id);
+    localStorage.removeItem(prefix + id);
+    drafts.delete(id);
+    if (id === dialogId) {
+      dialogId = uid();
+      storage.write('activeDialog', dialogId);
+      input.value = '';
+      showPhoto(null);
+      resizeInput();
+      voicePanel.open = false;
+      window.speechSynthesis?.cancel();
+      renderChat();
+      syncComposer();
+    }
+    renderHistory();
+    if (menu.open) recentList($('#recent-chats'), 12);
+    const list = menu.open ? $('#recent-chats') : $('#history-list');
+    (list.querySelector('.dialog-link') || (menu.open ? $('#close-menu') : $('#history [data-new-chat]'))).focus();
+    toast('Чат удалён с устройства');
+  }
   function clearDialogs() {
     disconnectPC();
     for (const id of dialogIds()) localStorage.removeItem(prefix + id);
@@ -532,12 +593,12 @@
     if (confirm('Удалить все чаты на этом устройстве и отключить синхронизацию?')) clearDialogs();
   };
   $('#clear-data').onclick = () => {
-    if (!confirm('Удалить чаты, заметки и планы на этом устройстве?')) return;
+    if (!confirm('Удалить профиль, чаты, заметки и планы на этом устройстве?')) return;
     clearDialogs();
     localStorage.removeItem('lumi:'+memoryKey); localStorage.removeItem('lumi:'+enabledKey); memoryEnabled.checked=true; refreshNotes();
     prefs.value='';
-    for (const key of ['tasks','notes','replyPrefs']) localStorage.removeItem('lumi:'+key);
-    renderTasks(); renderNotes(); toast('Локальные данные удалены');
+    for (const key of ['tasks','notes','replyPrefs','profile']) localStorage.removeItem('lumi:'+key);
+    renderTasks(); renderNotes(); renderProfile(); toast('Локальные данные удалены');
   };
   $('#map-form').addEventListener('submit',e=>{e.preventDefault();const q=$('#map-query').value.trim();if(q)window.open('https://yandex.ru/maps/?text='+encodeURIComponent(q),'_blank','noopener');});
   $$('[data-map]').forEach(b=>b.addEventListener('click',()=>window.open('https://yandex.ru/maps/?text='+encodeURIComponent(b.dataset.map+' рядом'),'_blank','noopener')));
