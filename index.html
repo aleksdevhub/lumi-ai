@@ -61,7 +61,7 @@
       <form class="composer" id="chat-form">
         <input type="file" id="photo-file" accept="image/*" hidden>
         <div id="photo-preview" hidden>
-          <img alt="Выбранное фото"><small>При отправке фото получит Gemini</small>
+          <img alt="Выбранное фото"><small>Фото отправится на сервер для анализа.</small>
           <button type="button" class="icon-button" id="remove-photo" aria-label="Убрать фото">×</button>
         </div>
         <textarea id="chat-input" rows="1" placeholder="Спроси у Lumi" aria-label="Сообщение"></textarea>
@@ -180,7 +180,7 @@
         </select>
       </label>
       <button type="button" id="voice-read">Перейти к тексту</button>
-      <small class="voice-disclosure">Распознавание и нейроозвучка работают через Gemini.</small>
+      <small class="voice-disclosure">Запись отправляется на сервер для распознавания.</small>
       <audio id="voice-audio" preload="none"></audio>
     </div>
   </dialog>
@@ -188,11 +188,11 @@
     <form method="dialog" class="model-sheet">
       <h2 id="model-title">Модель для чата</h2>
       <label class="model-option">
-        <span><strong>Lumi 1.0</strong><small>Текст, фото и голос · на базе Gemini</small></span>
+        <strong>Lumi 1.0</strong>
         <input type="radio" name="model" value="lumi-1">
       </label>
       <label class="model-option">
-        <span><strong>Lumi 1.1 Flash</strong><small>Gemini 3 Flash Preview · быстрый режим</small></span>
+        <strong>Lumi 1.1 Flash</strong>
         <input type="radio" name="model" value="lumi-flash" checked>
       </label>
       <button class="model-done" value="done" autofocus>Готово</button>
