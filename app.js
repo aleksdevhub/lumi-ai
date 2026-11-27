@@ -110,6 +110,18 @@
   viewport?.addEventListener('resize', fitViewport);
   fitViewport();
   const menu = $('#menu');
+  const modelPicker = $('#model-picker');
+  $('#open-model').addEventListener('click', () => {
+    modelPicker.showModal();
+    tg?.BackButton?.show();
+  });
+  modelPicker.addEventListener('close', () => {
+    $('#open-model').focus();
+    if (current === 'chat') tg?.BackButton?.hide();
+  });
+  modelPicker.addEventListener('click', event => {
+    if (event.target === modelPicker) modelPicker.close();
+  });
   const menuButton = $('#open-menu');
   menuButton.addEventListener('click', () => { recentList($('#recent-chats'), 12); menu.showModal(); });
   $('#close-menu').addEventListener('click', () => menu.close());
@@ -625,7 +637,8 @@
     finally {loadingNews=false;}
   }
   tg?.BackButton?.onClick(() => {
-    if (menu.open) menu.close();
+    if (modelPicker.open) modelPicker.close();
+    else if (menu.open) menu.close();
     else show($('.view.active').classList.contains('subview') ? previous : 'chat');
   });
 })();

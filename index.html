@@ -5,20 +5,27 @@
   <meta name="theme-color" content="#101010"><meta name="description" content="LUMI — личный AI-ассистент в Telegram">
   <title>LUMI — личный ассистент</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=cards-1">
+  <link rel="stylesheet" href="style.css?v=lumi-model-1">
 </head>
 <body><div class="app-shell">
   <header class="topbar">
     <button id="open-menu" class="icon-button" aria-label="Открыть меню" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
-    <button class="wordmark" data-open="chat">Lumi</button>
+    <button type="button" class="model-trigger" id="open-model" aria-haspopup="dialog" aria-controls="model-picker" aria-label="Выбрать модель: Lumi 1.0">
+      Lumi <span>1.0</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+    </button>
     <button type="button" class="icon-button" data-new-chat aria-label="Новый чат" title="Новый чат">＋</button>
   </header>
   <main>
     <section class="view active" id="chat" aria-label="Чат">
       <div id="chat-scroll">
         <div id="welcome">
-          <div class="fold" aria-hidden="true"><i></i><i></i><i></i></div>
-          <h1>Чем тебе помочь?</h1>
+          <div class="chat-greeting">
+            <div><h1>Привет, я Lumi</h1><p>С чего начнём?</p></div>
+            <div class="lumi-mascot" role="img" aria-label="Маскот Lumi — робот Фонарик">
+              <span class="mascot-antenna" aria-hidden="true"></span>
+              <span class="mascot-face" aria-hidden="true"><i></i><i></i><b></b></span>
+            </div>
+          </div>
           <div class="suggestions">
             <button data-prompt="Помоги составить план на день. "><span data-icon="calendar"></span>Составить план</button>
             <button data-prompt="Помоги отредактировать текст. "><span data-icon="note"></span>Улучшить текст</button>
@@ -100,6 +107,16 @@
     <section class="view subview" id="history"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Недавние чаты</h2><button class="new-chat" data-new-chat>＋ Новый чат</button></div><div id="history-list" class="entries"></div><button id="clear-history" class="text-button">Очистить чаты на устройстве</button></section>
     <section class="view subview" id="news"><button class="back" data-back>← <span>Сервисы</span></button><div class="view-head"><h2>Новости</h2><p>Открытая новостная лента.</p></div><div id="news-list" class="entries"><div class="empty">Проверяю доступность источника…</div></div><div class="fineprint">Заголовки из открытых новостных лент.</div></section>
   </main>
+  <dialog id="model-picker" aria-labelledby="model-title">
+    <form method="dialog" class="model-sheet">
+      <h2 id="model-title">Модель для чата</h2>
+      <label class="model-option">
+        <span><strong>Lumi 1.0</strong><small>Текст, фото и голос · на базе Gemini</small></span>
+        <input type="radio" name="model" value="lumi-1" checked>
+      </label>
+      <button class="model-done" value="done" autofocus>Готово</button>
+    </form>
+  </dialog>
   <dialog id="menu" aria-label="Навигация">
     <div class="menu-head"><strong>Lumi</strong><button id="close-menu" class="icon-button" aria-label="Закрыть меню">×</button></div>
     <button type="button" class="new-chat" data-new-chat>＋ Новый чат</button>
@@ -111,4 +128,4 @@
     </nav>
     <h3 class="recent-heading"><button type="button" data-open="history">Недавние чаты <span aria-hidden="true">›</span></button></h3><div id="recent-chats"></div>
   </dialog>
-</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=cards-1"></script></body></html>
+</div><div class="toast" id="toast" role="status"></div><script src="api-config.js?v=voice-v1"></script><script src="app.js?v=lumi-model-1"></script></body></html>
