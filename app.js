@@ -30,8 +30,8 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
     catch { toast('Не удалось сохранить тему на устройстве'); }
   });
   const modelLabels = {'lumi-1': 'Lumi 1.0', 'lumi-flash': 'Lumi 1.1 Flash', 'lumi-nova': 'Lumi 1.2 Nova'};
-  let selectedModel = storage.read('selectedModel', 'lumi-flash');
-  if (!Object.hasOwn(modelLabels, selectedModel)) selectedModel = 'lumi-flash';
+  let selectedModel = storage.read('selectedModelV2', 'lumi-nova');
+  if (!Object.hasOwn(modelLabels, selectedModel)) selectedModel = 'lumi-nova';
   const prefix = 'lumi:dialog:';
   const uid = () => crypto.randomUUID();
   const legacy = storage.read('messages');
@@ -171,7 +171,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
     if (!selected || selected.disabled) return;
     selectedModel = selected.value;
     renderModel();
-    try { storage.write('selectedModel', selectedModel); } catch {}
+    try { storage.write('selectedModelV2', selectedModel); } catch {}
   });
   $$('[data-model]').forEach(button => button.addEventListener('click', () => {
     modelTrigger = button;
@@ -513,9 +513,9 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
     frame(start);
   }
 
-  function modelHistory(messages, count) {
+  function modelHistory(messages, count, replyLimit = 4000) {
     return messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-count).map(m => ({
-      role: m.role, text: (m.role === 'assistant' ? replyDetails(m.text).body.slice(0, 4000) : m.text) || (m.thumb ? 'Фото' : ''),
+      role: m.role, text: (m.role === 'assistant' ? replyDetails(m.text).body.slice(0, replyLimit) : m.text) || (m.thumb ? 'Фото' : ''),
     }));
   }
 
@@ -547,13 +547,14 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
       let data = prepared;
       if (prepared?.replyError) throw new Error(prepared.replyError);
       if (!data) {
+        const nova = selectedModel === 'lumi-nova';
         const payload = {
           initData: tg?.initData || '',
           preferences: storage.read('replyPrefs', ''),
           model: selectedModel,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           memory: relatedNotes(text),
-          messages: modelHistory(messages, 16),
+          messages: nova ? modelHistory(messages, 24, 10000) : modelHistory(messages, 16),
         };
         const weather = !photo && weatherRequest(text);
         if (weather && !weather.city) {
@@ -564,7 +565,9 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
         } else if (!photo && imageRequest(text)?.prompt) {
           row.textContent = 'Создаю изображение…';
         }
-        while (payload.messages.length > 1 && new TextEncoder().encode(JSON.stringify(payload)).length > 23500) {
+        const maxPayload = nova ? 72000 : 23500;
+        const encoder = new TextEncoder();
+        while (payload.messages.length > 1 && encoder.encode(JSON.stringify(payload)).length > maxPayload) {
           payload.messages.shift();
         }
         if (photo) payload.photo = photo.data;

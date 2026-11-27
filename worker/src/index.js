@@ -1,5 +1,5 @@
 import {worldNews} from './live.js';
-import {answer, answerAudio, novaModel, transcribeAudio} from './assistant.js';
+import {answer, answerAudio, novaModel, novaThinking, transcribeAudio} from './assistant.js';
 import {imageRequest} from '../../intents.mjs';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
@@ -78,7 +78,7 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
       ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
-      novaProvider: 'gemini', novaModel,
+      novaProvider: 'gemini', novaModel, novaThinking,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
@@ -164,7 +164,7 @@ export default {
       const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
       if(!Array.isArray(items)||items.length>50||!Number.isSafeInteger(body.after)||body.after<0||
         items.some(m=>!m||!uuid.test(m.dialog)||!uuid.test(m.id)||!['user','assistant'].includes(m.role)||
-          typeof m.text!=='string'||m.text.length>20000||!Number.isSafeInteger(m.at)||
+          typeof m.text!=='string'||m.text.length>64000||!Number.isSafeInteger(m.at)||
           (m.thumb!=null && (typeof m.thumb!=='string'||m.thumb.length>100000||!m.thumb.startsWith('data:image/jpeg;base64,')))))
         return response({error:'Некорректные данные диалога'},400,allowed);
       const relay=env.PC_RELAY.get(env.PC_RELAY.idFromName('home'));
@@ -221,7 +221,7 @@ export default {
     }
     const photoRequest = url.pathname === "/chat/photo";
     if (request.method !== "POST" || (!photoRequest && url.pathname !== "/chat")) return response({ error: "Not found" }, 404, allowed);
-    const maxBody = photoRequest ? 1650000 : 24000;
+    const maxBody = photoRequest ? 1650000 : 74000;
     const length = Number(request.headers.get("Content-Length") || 0);
     if (length > maxBody) return response({ error: "Слишком большой запрос" }, 413, allowed);
     if (!env.TELEGRAM_BOT_TOKEN) return response({ error: "Backend secrets are not configured" }, 503, allowed);
@@ -252,7 +252,8 @@ export default {
     if (times.length >= 12) return response({ error: "Too many messages. Please wait a minute." }, 429, allowed);
     times.push(now); recent.set(key, times);
     if (recent.size > 10000) for (const [id, list] of recent) if (!list.some(t => now - t < 60000)) recent.delete(id);
-    const messages = Array.isArray(body.messages) ? body.messages.slice(-16) : [];
+    const nova = !body.model || body.model === 'lumi-nova';
+    const messages = Array.isArray(body.messages) ? body.messages.slice(nova ? -24 : -16) : [];
     if (photoRequest) {
       const photo = body.photo;
       const last = messages.at(-1);
@@ -266,7 +267,8 @@ export default {
     }
     const contents = [];
     for (const item of messages) {
-      if (!item || !["user", "assistant"].includes(item.role) || typeof item.text !== "string" || !item.text.trim() || item.text.length > 4000) continue;
+      if (!item || !["user", "assistant"].includes(item.role) || typeof item.text !== "string" || !item.text.trim()) continue;
+      if (item.text.length > (nova && item.role === "assistant" ? 10000 : 4000)) continue;
       contents.push({ role: item.role === "assistant" ? "model" : "user", parts: [{ text: item.text.trim() }] });
     }
     if (!contents.length || contents.at(-1).role !== "user") return response({ error: "Send a message to begin" }, 400, allowed);
@@ -293,6 +295,9 @@ export default {
       const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0,500) : '';
       return response(await answer(env,contents,preferences,body.memory,body.model,false,localContext(body)),200,allowed);
     } catch (error) {
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+        return response({error:'Модель не успела закончить ответ. Попробуй разбить запрос на части.'},504,allowed);
+      }
       return response({error:error.status===429?'Достигнут лимит модели. Попробуй позже.':'Не удалось получить ответ от модели. Попробуй позже.'},error.status===429?429:502,allowed);
     }
   }
