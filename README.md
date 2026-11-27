@@ -45,8 +45,6 @@ Worker конфигурирован для текущего публичного
 
 ### Lumi 1.2 Nova
 
-Nova использует [GPT‑6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna). Она отвечает на текст, анализирует вложенные фото и формулирует ответы на расшифрованные голосовые реплики. Распознавание и озвучка остаются в существующем голосовом сервисе.
+Nova использует [Gemini 4 Hydrogen](https://aistudio.google.com/docs/models/gemini-4-hydrogen) с серверным ключом `GEMINI_API_KEY`. Она отвечает на текст, анализирует вложенные фото и формулирует ответы на расшифрованные голосовые реплики. Распознавание и озвучка используют существующий голосовой сервис.
 
-1. Проверьте [доступность OpenAI API в вашем регионе](https://help.openai.com/en/articles/7947663-chatgpt-and-openai-api-supported-countries-and-territories). [Оплата API](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform) ведётся отдельно от подписки ChatGPT. Создайте [ключ проекта OpenAI](https://platform.openai.com/api-keys) с доступом к Chat Completions.
-2. В Cloudflare откройте **Workers & Pages → lumi-ai-api → Settings → Variables and Secrets**. Добавьте два секрета `OPENAI_API_KEY` и `NOVA_TELEGRAM_ID` с числовым ID из вкладки «Профиль» в LUMI. Сохраните и разверните настройки. Ключ вводится только в Cloudflare.
-3. Откройте LUMI из Telegram и выберите **Lumi 1.2 Nova** в меню моделей. Worker сверяет подписанные данные Telegram с заданным ID. Оплачиваемый режим доступен только этому аккаунту.
+Откройте LUMI из Telegram и выберите **Lumi 1.2 Nova** в меню моделей. Nova доступна всем пользователям с подтверждённой сессией Telegram. Квота Gemini API общая для пользователей бота. [Тарифы и бесплатный уровень Gemini](https://aistudio.google.com/docs/pricing#gemini-4-hydrogen).

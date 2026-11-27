@@ -1,6 +1,5 @@
 import {lookup,readPage,worldNews} from './live.js';
 import {newsRequest,weatherRequest,imageRequest} from '../../intents.mjs';
-import {novaModel, requestNova} from './nova.js';
 
 const tools = [{functionDeclarations:[
   {name:'read_page',description:'Read the public HTTPS page explicitly provided by the user for analysis. Pass its exact URL.',parameters:{type:'OBJECT',properties:{query:{type:'STRING'}},required:['query']}},
@@ -21,6 +20,7 @@ function fallback(kind, rows) {
 }
 
 const flashModel = 'gemini-3-flash-preview';
+export const novaModel = 'gemini-4-hydrogen';
 let flashRetryAt = 0;
 
 async function weatherReply(request, coords) {
@@ -71,6 +71,7 @@ function liteModel(env) {
 }
 
 function chatModel(env, selection) {
+  if (selection === 'lumi-nova') return novaModel;
   return selection === 'lumi-flash' ? flashModel : liteModel(env);
 }
 
@@ -86,6 +87,7 @@ async function requestModel(env, model, system, contents, requestOptions) {
       generationConfig: {
         maxOutputTokens: 1600, temperature: 0.4,
         ...(model === flashModel && {thinkingConfig: {thinkingLevel}}),
+        ...(model === novaModel && {thinkingConfig: {thinkingLevel: thinkingLevel === 'MINIMAL' ? 'LOW' : 'MEDIUM'}}),
         ...generationConfig,
       },
       ...options,
@@ -155,9 +157,7 @@ export async function answer(env,contents,preferences,memory=[],selection,forceL
       ...(context.voice && {generationConfig: {maxOutputTokens: 550}}),
       ...config,
     };
-    return selection === novaModel
-      ? requestNova(env, system, messages, options)
-      : generate(env, model, system, messages, options);
+    return generate(env, model, system, messages, options);
   };
   if (last.parts.length === 1) {
     const weather = weatherRequest(question);

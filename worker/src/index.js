@@ -1,9 +1,8 @@
 import {worldNews} from './live.js';
-import {answer, answerAudio, transcribeAudio} from './assistant.js';
+import {answer, answerAudio, novaModel, transcribeAudio} from './assistant.js';
 import {imageRequest} from '../../intents.mjs';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
-import {novaAvailableTo, novaConfigured, novaModel} from './nova.js';
 export {PcRelay};
 const encoder = new TextEncoder();
 const recent = new Map();
@@ -79,7 +78,7 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
       ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
-      novaProvider: 'openai',
+      novaProvider: 'gemini', novaModel,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
@@ -102,7 +101,7 @@ export default {
       try { body = JSON.parse(raw); } catch { return response({error: 'Некорректный запрос.'}, 400, allowed); }
       const user = typeof body?.initData === 'string' ? await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN) : null;
       if (!user?.id) return response({error: 'Открой LUMI через Telegram.'}, 401, allowed);
-      return response({novaAvailable: novaAvailableTo(env, user)}, 200, allowed);
+      return response({novaAvailable: Boolean(env.GEMINI_API_KEY)}, 200, allowed);
     }
     if (request.method === 'POST' && url.pathname === '/speak') {
       if (!env.GEMINI_API_KEY || !env.TELEGRAM_BOT_TOKEN) return response({error: 'Озвучка недоступна.'}, 503, allowed);
@@ -184,9 +183,6 @@ export default {
       } catch { return response({ error: "Не удалось прочитать запись." }, 400, allowed); }
       const user = typeof body?.initData === 'string' ? await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN) : null;
       if (!user?.id) return response({error: 'Сессия Telegram устарела. Закрой LUMI и открой из бота заново.'}, 401, allowed);
-      if (body.conversation === true && body.model === novaModel && !novaAvailableTo(env, user)) {
-        return response({error: 'Lumi 1.2 Nova недоступна. Выбери другую модель в меню.'}, novaConfigured(env) ? 403 : 503, allowed);
-      }
       const now = Date.now();
       const key = String(user.id);
       const times = (recent.get(key) || []).filter(t => now - t < 60000);
@@ -249,10 +245,7 @@ export default {
     } catch { return response({ error: "Invalid JSON" }, 400, allowed); }
     const user = typeof body.initData === 'string' ? await verifyTelegram(body.initData, env.TELEGRAM_BOT_TOKEN) : null;
     if (!user?.id) return response({ error: "Open LUMI from Telegram to chat" }, 401, allowed);
-    if (body.model !== novaModel && !env.GEMINI_API_KEY) return response({error: 'Модель временно недоступна.'}, 503, allowed);
-    if (body.model === novaModel && !novaAvailableTo(env, user)) {
-      return response({error: 'Lumi 1.2 Nova недоступна. Выбери другую модель в меню.'}, novaConfigured(env) ? 403 : 503, allowed);
-    }
+    if (!env.GEMINI_API_KEY) return response({error: 'Модель временно недоступна.'}, 503, allowed);
     const now = Date.now();
     const key = String(user.id);
     const times = (recent.get(key) || []).filter(t => now - t < 60000);
@@ -300,7 +293,6 @@ export default {
       const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0,500) : '';
       return response(await answer(env,contents,preferences,body.memory,body.model,false,localContext(body)),200,allowed);
     } catch (error) {
-      if (error.isNova) return response({error: error.message}, error.status, allowed);
       return response({error:error.status===429?'Достигнут лимит модели. Попробуй позже.':'Не удалось получить ответ от модели. Попробуй позже.'},error.status===429?429:502,allowed);
     }
   }
