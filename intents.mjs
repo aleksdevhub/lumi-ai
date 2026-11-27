@@ -6,8 +6,9 @@ export function weatherRequest(text) {
   if (!/погод|weather|(?:дождь|снег)|градус/iu.test(query) && /(?:курс|цен|продаж|бирж|матч|акци|экономик|рост)/iu.test(query)) return null;
   const week = /недел[юеи]|(?:7|семь)\s+(?:дней|суток)|week|7 days/iu.test(query);
   const tomorrow = /завтра|tomorrow/iu.test(query);
-  const citedPlace = query.match(/(?:^|\s)(?:в|во|для|in)\s+([\p{L}][\p{L} .-]{1,55})$/iu)?.[1]
-    ?? query.match(/^\/?погода\s+([\p{L}][\p{L} .-]{1,55})$/iu)?.[1];
+  const placeQuery = query.split(/[, ]+на\s+(?:(?:ближайшие|следующие)\s+)?(?:неделю|(?:7|семь)\s+(?:дней|суток)|(?:ближайшие\s+)?дни|завтра|сегодня)(?=\s|[,.!?]|$)|\s+(?:for\s+)?(?:the\s+next\s+7\s+days|this\s+week)(?=\s|[,.!?]|$)/iu)[0];
+  const citedPlace = placeQuery.match(/(?:^|\s)(?:в|во|для|in)\s+([\p{L}][\p{L} .-]{1,55})$/iu)?.[1]
+    ?? placeQuery.match(/^\/?погода\s+([\p{L}][\p{L} .-]{1,55})$/iu)?.[1];
   const city = (citedPlace || '').replace(/\b(?:today|tomorrow|this week)\b|(?:^|\s)(?:на неделю|на завтра|на сегодня|на 7 дней|на семь дней|сегодня|завтра|сейчас|утром|вечером|у меня)(?=\s|$)/giu, '').trim();
   return {days: week ? 7 : 1, tomorrow, city: /^(?:на|у|рядом|здесь|сегодня|сейчас|завтра|на улице|завтра утром|на ближайшие дни|у меня|здесь сейчас|мо[её]м городе|нашем городе|my city|my area)$/iu.test(city) ? '' : city};
 }

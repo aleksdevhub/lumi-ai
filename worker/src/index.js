@@ -1,5 +1,5 @@
 import {worldNews} from './live.js';
-import {answer, answerAudio, novaModel, novaThinking, transcribeAudio} from './assistant.js';
+import {answer, answerAudio, novaBackupModel, novaModel, novaThinking, transcribeAudio} from './assistant.js';
 import {imageRequest} from '../../intents.mjs';
 import {PcRelay, matches} from './pc.js';
 import {welcomeTelegram} from './bot.js';
@@ -78,7 +78,7 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
       ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
-      novaProvider: 'gemini', novaModel, novaThinking,
+      novaProvider: 'gemini', novaModel, novaThinking, novaBackupModel,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
@@ -298,7 +298,9 @@ export default {
       if (error.name === 'TimeoutError' || error.name === 'AbortError') {
         return response({error:'Модель не успела закончить ответ. Попробуй разбить запрос на части.'},504,allowed);
       }
-      return response({error:error.status===429?'Достигнут лимит модели. Попробуй позже.':'Не удалось получить ответ от модели. Попробуй позже.'},error.status===429?429:502,allowed);
+      const limited = error.status === 429;
+      const limitMessage = nova ? 'Достигнут лимит доступных моделей. Попробуй позже.' : 'Достигнут лимит модели. Попробуй позже.';
+      return response({error:limited?limitMessage:'Не удалось получить ответ от модели. Попробуй позже.'},limited?429:502,allowed);
     }
   }
 };

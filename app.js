@@ -1,4 +1,4 @@
-import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
+import {weatherRequest, imageRequest} from './intents.mjs?v=nova-reliability-1';
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
@@ -505,7 +505,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
       const count = immediate || !duration ? letters.length :
         Math.min(letters.length, 1 + Math.floor(letters.length * (now - start) / duration));
       if (count > shown) text.appendData(letters.slice(shown, count).join(''));
-      shown = count;
+      shown = Math.max(shown, count);
       if (follow) scroll.scrollTop = scroll.scrollHeight;
       if (shown < letters.length) requestAnimationFrame(frame);
       else {row.removeAttribute('aria-busy');attachSources(row,details);if(follow)scroll.scrollTop=scroll.scrollHeight;}
@@ -581,6 +581,7 @@ import {weatherRequest, imageRequest} from './intents.mjs?v=voice-fix-2';
         if (!response.ok) throw new Error(data.error || 'Не удалось получить ответ');
       }
       if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('Модель не вернула ответ.');
+      if (data.usedFallback && dialogId === target) toast('Nova временно недоступна. Ответ подготовила запасная модель.');
       const historyNow = dialogMessages(target);
       if (!historyNow.some(m => m.id === messages.at(-1).id)) return;
       if(memoryEnabled.checked && data.note?.url && data.note.excerpt) {
