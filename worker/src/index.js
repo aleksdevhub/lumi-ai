@@ -4,8 +4,9 @@ import {imageRequest} from '../../intents.mjs';
 import {normalizePersonalMemory} from '../../personal-memory.mjs';
 import {normalizeSources} from '../../source-followup.mjs';
 import {PcRelay, matches} from './pc.js';
-import {welcomeTelegram} from './bot.js';
+import {handleTelegram} from './bot.js';
 export {PcRelay};
+export {LumiReminders} from './reminders.js';
 const encoder = new TextEncoder();
 const recent = new Map();
 
@@ -73,7 +74,7 @@ export default {
       let mismatch = 0;
       for (let i = 0; i < expected.length; i++) mismatch |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
       if (mismatch) return response({error: 'Unauthorized'}, 401);
-      return welcomeTelegram(request, env.TELEGRAM_BOT_TOKEN);
+      return handleTelegram(request, env);
     }
     if (request.method === 'GET' && url.pathname === '/news') {
       const timeZone = (url.searchParams.get('timeZone') || 'UTC').slice(0, 64);
@@ -83,6 +84,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/health") return response({
       ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather","calculate"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
       novaProvider: 'gemini', novaModel, novaThinking, novaBackupModel, novaLiteBackup: true, maxToolRounds, personalMemory: true, draftReview: true, datedHeadlines: true, sourceFollowup: true,
+      telegramReminders: Boolean(env.REMINDERS),
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       if (!await matches(request.headers.get('Sec-WebSocket-Protocol')?.split(',')[1]?.trim(), env.PC_HASH))
