@@ -77,7 +77,7 @@ export default {
       return response({items: items.map(({title,url,date}) => ({title,url,date}))}, items.length ? 200 : 503, allowed);
     }
     if (request.method === "GET" && url.pathname === "/health") return response({
-      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
+      ok: true, service: "lumi-ai-api", liveTools: ["search","news","weather","calculate"], voiceConversation: true, voiceRecovery: 'split', imageGeneration: !!env.AI,
       novaProvider: 'gemini', novaModel, novaThinking, novaBackupModel, novaLiteBackup: true,
     }, 200, allowed);
     if (url.pathname === '/pc/connect' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
@@ -295,6 +295,7 @@ export default {
       const preferences = typeof body.preferences === 'string' ? body.preferences.trim().slice(0,500) : '';
       return response(await answer(env,contents,preferences,body.memory,body.model,false,localContext(body)),200,allowed);
     } catch (error) {
+      if (error.invalidJson) return response({error:error.message},502,allowed);
       if (error.name === 'TimeoutError' || error.name === 'AbortError') {
         return response({error:'Модель не успела закончить ответ. Попробуй разбить запрос на части.'},504,allowed);
       }
