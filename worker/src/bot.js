@@ -1,7 +1,7 @@
 const APP_URL = 'https://aleksdevhub.github.io/lumi-ai/';
 const WELCOME = 'Привет! Я Lumi, твой помощник. Могу объяснить сложное, помочь с текстом, разобрать фото и составить план. Открой LUMI, чтобы начать.';
 
-export async function callTelegram(token, method, payload = {}) {
+async function callTelegram(token, method, payload = {}) {
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
